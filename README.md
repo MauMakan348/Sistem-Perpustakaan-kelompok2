@@ -6,7 +6,7 @@ menjadi arsitektur **microservice** dengan 2 service yang berkomunikasi lewat RE
 ## Anggota Kelompok
 - Shandy Aulia (2441919027)
 - Sri maharani (2441919028)
-- Putra Aji Pratama (2441919011)
+- Putra Aji Pratama (2441919011).
 - Muhammad Lutfi Rivani (2441919037)
 - Lia Saripah (2441919012).
 
