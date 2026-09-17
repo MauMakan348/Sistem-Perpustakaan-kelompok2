@@ -111,7 +111,12 @@ npx serve .
 
 ## User Story & Acceptance Criteria
 Menggunakan ulang User Story dan Acceptance Criteria dari Praktikum RE dengan AI
-sebelumnya (US-01, US-02, US-03, AC-01, AC-02, AC-03) — lihat laporan Praktikum 2.
+sebelumnya (US-01, US-02, US-03, AC-01, AC-02, AC-03).
+| ID | User Story |
+|---|---|
+| US-01 | Sebagai mahasiswa, saya ingin meminjam buku informatika dasar sehingga dapat memahami ilmu informatika. |
+| US-02 | Sebagai mahasiswa, saya ingin melihat buku sistem informasi yang masih tersedia sehingga saya bisa menetukan buku yang ingin dipinjam. |
+| US-03 | Sebagai mahasiswa, saya ingin meminjam buku programming sehingga dapat memahami dan melakukan pemrograman. |
 
 ## Dokumentasi Penggunaan AI Coding Tool
 Lihat [`docs/ai-usage.md`](docs/ai-usage.md) dan [`docs/prompts.md`](docs/prompts.md)
