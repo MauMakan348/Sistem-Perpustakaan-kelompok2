@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Sistem Peminjaman Buku Perpustakaan (Microservice)</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <section id="loginScreen" class="screen">
+    <div class="card">
+      <h1>📚 Perpustakaan Kampus</h1>
+      <p class="subtitle">Login untuk melihat & meminjam buku</p>
+      <label for="namaInput">Nama Mahasiswa</label>
+      <input type="text" id="namaInput" placeholder="Contoh: Rina Amelia" />
+      <button id="btnLogin">Login</button>
+      <p class="hint">*Data kini disimpan di server (Book Service & Loan Service), bukan lagi di localStorage.</p>
+    </div>
+  </section>
+
+  <section id="appScreen" class="screen hidden">
+    <header>
+      <h1>📚 Perpustakaan Kampus</h1>
+      <div class="user-info">
+        <span id="namaMahasiswa"></span>
+        <button id="btnLogout">Logout</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Daftar Buku</h2>
+        <table id="tabelBuku">
+          <thead>
+            <tr><th>Judul</th><th>Penulis</th><th>Status</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="bodyBuku"></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Buku Saya (<span id="jumlahPinjam">0</span>/3)</h2>
+        <table id="tabelPinjaman">
+          <thead>
+            <tr><th>Judul</th><th>Tanggal Pinjam</th><th>Jatuh Tempo</th></tr>
+          </thead>
+          <tbody id="bodyPinjaman"></tbody>
+        </table>
+      </section>
+    </main>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>

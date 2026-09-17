@@ -1,0 +1,120 @@
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #f2f4f7;
+  margin: 0;
+  color: #1f2937;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- LOGIN ---------- */
+#loginScreen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  background: #fff;
+  padding: 32px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  width: 320px;
+  text-align: center;
+}
+
+.card h1 { margin-top: 0; font-size: 22px; }
+.subtitle { color: #6b7280; font-size: 14px; margin-bottom: 20px; }
+
+.card label {
+  display: block;
+  text-align: left;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #374151;
+}
+
+.card input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.card button, header button, td button {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.card button { width: 100%; }
+.card button:hover, header button:hover, td button:hover { background: #1d4ed8; }
+
+.hint { font-size: 11px; color: #9ca3af; margin-top: 14px; }
+
+/* ---------- APP ---------- */
+header {
+  background: #fff;
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+header h1 { font-size: 18px; margin: 0; }
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+}
+
+.user-info button { background: #ef4444; }
+.user-info button:hover { background: #dc2626; }
+
+main {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.panel {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.panel h2 { margin-top: 0; font-size: 16px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.status-tersedia { color: #16a34a; font-weight: 600; }
+.status-dipinjam { color: #dc2626; font-weight: 600; }
+
+td button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}

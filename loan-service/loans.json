@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1789613061525,
+    "username": "Rina Amelia",
+    "bookId": 1,
+    "bookTitle": "Informatika Dasar",
+    "borrowDate": "2026-09-17T02:44:21.525Z",
+    "dueDate": "2026-09-24T02:44:21.525Z"
+  },
+  {
+    "id": 1789613061537,
+    "username": "Rina Amelia",
+    "bookId": 2,
+    "bookTitle": "Sistem Informasi",
+    "borrowDate": "2026-09-17T02:44:21.537Z",
+    "dueDate": "2026-09-24T02:44:21.537Z"
+  },
+  {
+    "id": 1789613061544,
+    "username": "Rina Amelia",
+    "bookId": 3,
+    "bookTitle": "Dasar-Dasar Programming",
+    "borrowDate": "2026-09-17T02:44:21.544Z",
+    "dueDate": "2026-09-24T02:44:21.544Z"
+  }
+]

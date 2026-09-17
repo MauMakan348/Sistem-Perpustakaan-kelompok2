@@ -1,0 +1,9 @@
+{
+  "name": "book-service",
+  "version": "1.0.0",
+  "description": "Microservice untuk mengelola data buku perpustakaan (Node.js core http, tanpa dependency eksternal)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

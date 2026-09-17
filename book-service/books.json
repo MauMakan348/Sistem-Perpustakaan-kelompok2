@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "title": "Informatika Dasar",
+    "author": "Andi Pratama",
+    "status": "tersedia"
+  },
+  {
+    "id": 2,
+    "title": "Sistem Informasi",
+    "author": "Budi Santoso",
+    "status": "tersedia"
+  },
+  {
+    "id": 3,
+    "title": "Dasar-Dasar Programming",
+    "author": "Citra Dewi",
+    "status": "tersedia"
+  },
+  {
+    "id": 4,
+    "title": "Pemrograman Web",
+    "author": "Dedi Kurniawan",
+    "status": "tersedia"
+  },
+  {
+    "id": 5,
+    "title": "Algoritma dan Struktur Data",
+    "author": "Eko Wijaya",
+    "status": "tersedia"
+  }
+]
