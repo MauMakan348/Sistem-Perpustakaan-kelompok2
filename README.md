@@ -102,7 +102,7 @@ npx serve .
 
 ## Alur Fitur Utama (melibatkan 2 service)
 1. Frontend memanggil `POST /loans` ke **Loan Service**.
-2. **Loan Service** mengecek jumlah buku aktif mahasiswa (data sendiri).
+2. **Loan Service** mengecek jumlah buku aktif mahasiswa (data sendiri)..
 3. **Loan Service** memanggil `GET /books/:id` ke **Book Service** untuk memastikan buku tersedia.
 4. Jika lolos, Loan Service mencatat peminjaman lalu memanggil `PATCH /books/:id/status`
    ke Book Service untuk mengubah status buku menjadi `dipinjam`.
