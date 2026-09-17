@@ -118,6 +118,12 @@ sebelumnya (US-01, US-02, US-03, AC-01, AC-02, AC-03).
 | US-02 | Sebagai mahasiswa, saya ingin melihat buku sistem informasi yang masih tersedia sehingga saya bisa menetukan buku yang ingin dipinjam. |
 | US-03 | Sebagai mahasiswa, saya ingin meminjam buku programming sehingga dapat memahami dan melakukan pemrograman. |
 
+| No | Given / Kondisi | When / Aksi | Then / Hasil |
+|---|---|---|---|
+| AC-01 | Mahasiswa sudah login dan buku berstatus tersedia	 | Mahasiswa memilih tombol pinjam | Buku berhasil dipinjam dan statusnya berubah menjadi dipinjam |
+| AC-02 | Mahasiswa sudah memiliki 3 buku aktif	| Mahasiswa mencoba meminjam buku lain | Peminjaman ditolak oleh sistem |
+| AC-03 | Buku berstatus sedang dipinjam mahasiswa lain	| Mahasiswa mencoba meminjam buku tersebut | Peminjaman ditolak oleh sistem |
+
 ## Dokumentasi Penggunaan AI Coding Tool
 Lihat [`docs/ai-usage.md`](docs/ai-usage.md) dan [`docs/prompts.md`](docs/prompts.md)
 untuk penjelasan bagaimana AI digunakan dalam pengembangan, serta masalah yang
