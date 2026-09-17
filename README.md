@@ -4,11 +4,11 @@ Pengembangan dari proyek Praktikum RE dengan AI (aplikasi single-page dengan loc
 menjadi arsitektur **microservice** dengan 2 service yang berkomunikasi lewat REST API.
 
 ## Anggota Kelompok
-- 1. Shandy Aulia (2441919027)
-- 2. Sri maharani (2441919028)
-- 3. Putra Aji Pratama (2441919011)
-- 4. Muhammad Lutfi Rivani (2441919037)
-- 5. Lia Saripah (2441919012)
+- Shandy Aulia (2441919027)
+- Sri maharani (2441919028)
+- Putra Aji Pratama (2441919011)
+- Muhammad Lutfi Rivani (2441919037)
+- Lia Saripah (2441919012)
 
 
 ## Arsitektur
