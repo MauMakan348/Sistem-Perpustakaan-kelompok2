@@ -8,7 +8,7 @@ menjadi arsitektur **microservice** dengan 2 service yang berkomunikasi lewat RE
 - Sri maharani (2441919028)
 - Putra Aji Pratama (2441919011)
 - Muhammad Lutfi Rivani (2441919037)
-- Lia Saripah (2441919012)
+- Lia Saripah (2441919012).
 
 
 ## Arsitektur
