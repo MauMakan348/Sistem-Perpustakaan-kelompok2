@@ -1,5 +1,5 @@
 # Dokumentasi Penggunaan AI Coding Tool
-woii kerjaaa
+
 **AI Coding Tool yang digunakan:** Claude (Anthropic), diakses melalui claude.ai
 
 ## Bagaimana AI Membantu Proses Pengembangan
