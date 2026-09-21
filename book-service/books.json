@@ -1,32 +1,50 @@
 [
   {
     "id": 1,
-    "title": "Informatika Dasar",
+    "title": "Cara Membedakan Tangan Kanan dan Tangan Kiri",
     "author": "Andi Pratama",
     "status": "tersedia"
   },
   {
     "id": 2,
-    "title": "Sistem Informasi",
-    "author": "Budi Santoso",
+    "title": "Bumbu Kacang Asli dari Kebumen",
+    "author": "Mas Narji",
     "status": "tersedia"
   },
   {
     "id": 3,
-    "title": "Dasar-Dasar Programming",
-    "author": "Citra Dewi",
+    "title": "Programming Ala Prororo",
+    "author": "Si Gemoy",
     "status": "tersedia"
   },
   {
     "id": 4,
-    "title": "Pemrograman Web",
-    "author": "Dedi Kurniawan",
+    "title": "Ayah Kenapa Aku WNI",
+    "author": "Cavein",
     "status": "tersedia"
   },
   {
     "id": 5,
-    "title": "Algoritma dan Struktur Data",
-    "author": "Eko Wijaya",
+    "title": "Puding Coklat Pak Hambali",
+    "author": "Hambali Projek",
+    "status": "tersedia"
+  },
+  {
+    "id": 6,
+    "title": "Bumi",
+    "author": "Tere Liye",
+    "status": "tersedia"
+  },
+  {
+    "id": 7,
+    "title": "Made in Jarvis",
+    "author": "Toni Stack",
+    "status": "tersedia"
+  },
+  {
+    "id": 8,
+    "title": "Aku Bisa Pasang Kopling Supra",
+    "author": "Asep Jokjakarta",
     "status": "tersedia"
   }
 ]
