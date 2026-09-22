@@ -15,8 +15,8 @@ menjadi arsitektur **microservice** dengan 2 service yang berkomunikasi lewat RE
 
 ```
 ┌─────────────┐        HTTP/JSON        ┌──────────────┐        HTTP/JSON        ┌───────────────┐
-│  Frontend   │ ───────────────────────▶│ Loan Service │ ───────────────────────▶│ Book Service  │
-│ (HTML/JS)   │◀─────────────────────── │  (port 4002) │◀───────────────────────  │  (port 4001)  │
+│  Frontend   │ ──────────────────────▶│ Loan Service │ ──────────────────────▶│ Book Service  │
+│ (HTML/JS)   │◀────────────────────── │  (port 4002) │◀────────────────────── │  (port 4001)  │
 └─────────────┘                         └──────────────┘                         └───────────────┘
                                           - login                                  - daftar buku
                                           - pinjam buku                            - status ketersediaan
