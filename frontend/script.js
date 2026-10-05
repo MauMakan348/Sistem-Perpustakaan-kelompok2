@@ -7,8 +7,20 @@
 // supaya sesi login tidak hilang saat refresh halaman.
 // =========================================================
 
-const BOOK_SERVICE = "http://localhost:4001";
-const LOAN_SERVICE = "http://localhost:4002";
+const API_GATEWAY = "http://localhost:4000";
+const API_KEY = "perpus-kel2";
+
+function apiFetch(path, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    "X-API-Key": API_KEY,
+  };
+
+  return fetch(`${API_GATEWAY}${path}`, {
+    ...options,
+    headers,
+  });
+}
 const MAX_ACTIVE_LOANS = 3;
 
 function getCurrentUser() {
@@ -24,7 +36,7 @@ document.getElementById("btnLogin").addEventListener("click", async () => {
   }
 
   try {
-    const res = await fetch(`${LOAN_SERVICE}/login`, {
+    const res = await apiFetch(`/api/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: nama }),
@@ -39,7 +51,7 @@ document.getElementById("btnLogin").addEventListener("click", async () => {
     localStorage.setItem("perpus_currentUser", data.username);
     showApp();
   } catch (err) {
-    alert("Tidak dapat menghubungi Loan Service. Pastikan service sudah berjalan.");
+    alert("Tidak dapat menghubungi API Gateway. Pastikan Gateway dan service sudah berjalan.");
   }
 });
 
@@ -62,8 +74,8 @@ async function renderBooks() {
   const user = getCurrentUser();
 
   const [books, myLoans] = await Promise.all([
-    fetch(`${BOOK_SERVICE}/books`).then(r => r.json()),
-    fetch(`${LOAN_SERVICE}/loans/${encodeURIComponent(user)}`).then(r => r.json()),
+    apiFetch(`/api/books`).then(r => r.json()),
+    apiFetch(`/api/loans/${encodeURIComponent(user)}`).then(r => r.json()),
   ]);
 
   const limitReached = myLoans.length >= MAX_ACTIVE_LOANS;
@@ -98,7 +110,7 @@ async function borrowBook(bookId) {
   const user = getCurrentUser();
 
   try {
-    const res = await fetch(`${LOAN_SERVICE}/loans`, {
+    const res = await apiFetch(`/api/loans`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: user, bookId }),
@@ -115,14 +127,14 @@ async function borrowBook(bookId) {
     await renderBooks();
     await renderMyLoans();
   } catch (err) {
-    alert("Tidak dapat menghubungi Loan Service. Pastikan service sudah berjalan.");
+    alert("Tidak dapat menghubungi API Gateway. Pastikan Gateway dan service sudah berjalan.");
   }
 }
 
 // ================== BUKU SAYA ==================
 async function renderMyLoans() {
   const user = getCurrentUser();
-  const myLoans = await fetch(`${LOAN_SERVICE}/loans/${encodeURIComponent(user)}`).then(r => r.json());
+  const myLoans = await apiFetch(`/api/loans/${encodeURIComponent(user)}`).then(r => r.json());
 
   document.getElementById("jumlahPinjam").innerText = myLoans.length;
 
