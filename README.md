@@ -1,54 +1,219 @@
 # Sistem Peminjaman Buku Perpustakaan — Microservice
 
-Pengembangan dari proyek Praktikum RE dengan AI (aplikasi single-page dengan localStorage)
-menjadi arsitektur **microservice** dengan 2 service yang berkomunikasi lewat REST API.
+## 1. Nama Project
 
-## Anggota Kelompok
-- Shandy Aulia (2441919027)
-- Sri maharani (2441919028)
-- Putra Aji Pratama (2441919011).
-- Muhammad Lutfi Rivani (2441919037)
-- Lia Saripah (2441919012).
+**Sistem Peminjaman Buku Perpustakaan — Microservice**
 
+Project ini merupakan pengembangan dari project Sistem Perpustakaan sebelumnya menjadi aplikasi berbasis microservice.
 
-## Arsitektur
+## 2. Deskripsi
 
+Sistem digunakan untuk melihat daftar buku, melihat status ketersediaan buku, login mahasiswa, melihat peminjaman aktif, dan melakukan peminjaman buku.
+
+Versi saat ini menggunakan dua microservice utama, yaitu **Book Service** dan **Loan Service**, serta **API Gateway** sebagai satu-satunya entry point untuk client. Data utama masing-masing service disimpan pada database MySQL yang terpisah.
+
+## 3. Tujuan Project
+
+Tujuan pengembangan adalah menerapkan konsep microservice pada project Sistem Perpustakaan yang sudah ada, dengan:
+
+- pemisahan tanggung jawab antar-service;
+- API Gateway sebagai entry point client;
+- komunikasi antar-service melalui HTTP API;
+- database terpisah berdasarkan ownership service;
+- API Key authentication pada Gateway; dan
+- pengujian API menggunakan Postman.
+
+## 4. Architecture Sebelum
+
+Versi sebelumnya merupakan aplikasi web sederhana dengan frontend HTML/CSS/JavaScript dan persistence menggunakan file/localStorage pada tahap awal project. Pada tahap microservice awal, Book Service dan Loan Service sudah dipisahkan, tetapi client masih dapat berkomunikasi langsung dengan service internal.
+
+Secara sederhana:
+
+```text
+Client / Frontend
+      |             \
+      v              v
+Book Service      Loan Service
+  :4001              :4002
+      |                |
+  books data       loans data
 ```
-┌─────────────┐        HTTP/JSON        ┌──────────────┐        HTTP/JSON        ┌───────────────┐
-│  Frontend   │ ───────────────────────▶│ Loan Service │ ───────────────────────▶│ Book Service  │
-│ (HTML/JS)   │◀─────────────────────── │  (port 4002) │◀───────────────────────  │  (port 4001)  │
-└─────────────┘                         └──────────────┘                         └───────────────┘
-                                          - login                                  - daftar buku
-                                          - pinjam buku                            - status ketersediaan
-                                          - cek limit 3 buku aktif                 - update status buku
-                                          - hitung jatuh tempo (7 hari)
+
+## 5. Architecture Sesudah
+
+Arsitektur yang sudah diimplementasikan:
+
+```text
+                         Client
+                  Web / Postman / Client
+                            |
+                     X-API-Key + HTTP
+                            |
+                            v
+                   API Gateway :4000
+                     /             \
+                    /               \
+                   v                 v
+          Book Service :4001   Loan Service :4002
+                   |                 |
+                   v                 |
+          Book MySQL (`book_db`)            |
+                                     v
+                              Loan MySQL (`loan_db`)
+
+Loan Service <---- HTTP API ----> Book Service
 ```
 
-Lihat penjelasan lebih detail di [`docs/architecture.md`](docs/architecture.md).
+Client menggunakan Gateway `:4000`. Port `:4001` dan `:4002` merupakan port service internal.
 
-## Technology yang Digunakan
-| Bagian | Teknologi | Keterangan |
+## 6. Daftar Microservice
+
+| Komponen | Port | Tanggung jawab |
+|---|---:|---|
+| API Gateway | 4000 | Entry point client, API Key authentication, routing dan forwarding |
+| Book Service | 4001 | Data buku dan status ketersediaan buku |
+| Loan Service | 4002 | Login, transaksi peminjaman, batas 3 buku aktif dan jatuh tempo 7 hari |
+
+## 7. Fungsi Setiap Service
+
+### API Gateway
+
+- Menerima request client.
+- Memeriksa header `X-API-Key`.
+- Meneruskan request ke service tujuan.
+- Meneruskan method, path, body, header yang relevan, status response, dan body response.
+- Mengembalikan `502` jika service internal tidak tersedia.
+- Tidak menjalankan business logic buku atau peminjaman.
+
+### Book Service
+
+- Mengambil daftar buku.
+- Mengambil detail buku.
+- Mengubah status buku menjadi `tersedia` atau `dipinjam`.
+- Mengakses Book MySQL (`book_db`).
+
+### Loan Service
+
+- Login sederhana berdasarkan username.
+- Mengambil daftar peminjaman aktif mahasiswa.
+- Memvalidasi transaksi peminjaman.
+- Membatasi maksimal 3 peminjaman aktif.
+- Menetapkan masa pinjam 7 hari.
+- Memanggil Book Service melalui HTTP API untuk mengecek dan mengubah status buku.
+- Mengakses Loan MySQL (`loan_db`).
+
+## 8. API Gateway
+
+Gateway berjalan pada:
+
+```text
+http://localhost:4000
+```
+
+Endpoint publik yang tersedia:
+
+| Method | Endpoint | Tujuan |
 |---|---|---|
-| Book Service | Node.js (modul `http`, `fs` bawaan) | Tanpa framework/dependency eksternal |
-| Loan Service | Node.js (modul `http`, `fs` bawaan) | Memanggil Book Service via `http.request` |
-| Penyimpanan data | File JSON per service | `books.json`, `loans.json` |
-| Frontend | HTML5, CSS3, Vanilla JavaScript | Memanggil kedua service via `fetch()` |
-| AI Coding Tool | Claude (Anthropic) | Lihat [`docs/ai-usage.md`](docs/ai-usage.md) |
+| GET | `/api/books` | Daftar buku |
+| GET | `/api/books/:id` | Detail buku |
+| PATCH | `/api/books/:id/status` | Mengubah status buku |
+| POST | `/api/login` | Login sederhana |
+| GET | `/api/loans/:username` | Peminjaman aktif |
+| POST | `/api/loans` | Membuat peminjaman |
 
-> Sengaja tidak memakai Express/Axios agar proyek bisa langsung dijalankan dengan
-> `node server.js` tanpa proses `npm install`, menghindari kendala saat demo.
+Gateway meneruskan route ke endpoint internal yang sesuai. Client tidak perlu memanggil `:4001` atau `:4002` secara langsung.
 
-## Struktur Folder
+## 9. Database
+
+Terdapat dua database MySQL dengan ownership terpisah:
+
+```text
+Book Service  -> book_db -> books
+Loan Service  -> loan_db -> loans
 ```
-perpustakaan-microservice/
+
+Loan Service **tidak mengakses Book Database secara langsung**. Informasi buku diperoleh melalui API Book Service.
+
+File terkait database:
+
+```text
+book-service/db.js
+book-service/schema.sql
+book-service/migrate.js
+loan-service/db.js
+loan-service/schema.sql
+loan-service/migrate.js
+```
+
+File `books.json` dan `loans.json` tetap berada di project sebagai data sumber migrasi lama. Script migration melakukan upsert ke MySQL dan tidak menghapus file JSON.
+
+## 10. API Key
+
+Gateway menggunakan header:
+
+```text
+X-API-Key: <API_KEY>
+```
+
+API Key disimpan pada environment variable `API_KEY`, bukan di source code.
+
+Contoh konfigurasi:
+
+```env
+API_KEY=your_api_key_here
+```
+
+Jika key tidak ada atau salah, Gateway mengembalikan:
+
+```http
+401 Unauthorized
+```
+
+API Key tidak disimpan di frontend public. Pengujian API dengan key dilakukan melalui Postman.
+
+## 11. Technology Stack
+
+| Bagian | Teknologi |
+|---|---|
+| Backend | Node.js native HTTP |
+| Gateway | Node.js native HTTP |
+| Database | MySQL |
+| Database driver | `mysql2` |
+| Environment configuration | `dotenv` |
+| Frontend | HTML5, CSS3, Vanilla JavaScript |
+| API testing | Postman |
+| AI Coding Assistant | ChatGPT |
+
+Project sengaja tidak menggunakan Express atau framework backend tambahan.
+
+## 12. Struktur Folder
+
+```text
+perpustakaan2/
+├── api-gateway/
+│   ├── server.js
+│   ├── package.json
+│   ├── .env.example
+│   ├── .gitignore
+│   └── README.md
 ├── book-service/
 │   ├── server.js
+│   ├── db.js
+│   ├── migrate.js
+│   ├── schema.sql
 │   ├── books.json
-│   └── package.json
+│   ├── package.json
+│   ├── .env.example
+│   └── .gitignore
 ├── loan-service/
 │   ├── server.js
+│   ├── db.js
+│   ├── migrate.js
+│   ├── schema.sql
 │   ├── loans.json
-│   └── package.json
+│   ├── package.json
+│   ├── .env.example
+│   └── .gitignore
 ├── frontend/
 │   ├── index.html
 │   ├── style.css
@@ -56,75 +221,337 @@ perpustakaan-microservice/
 ├── docs/
 │   ├── architecture.md
 │   ├── ai-usage.md
-│   └── prompts.md
+│   ├── prompts.md
+│   ├── e2e-loan-flow.md
+│   └── postman-testing.md
+├── postman/
+│   └── Sistem-Perpustakaan.postman_collection.json
+├── .gitignore
 └── README.md
 ```
 
-## Cara Menjalankan
+## 13. Cara Install
 
-**1. Jalankan Book Service** (terminal 1):
+Pastikan sudah tersedia:
+
+- Node.js
+- MySQL
+- npm
+
+Install dependency setiap service:
+
 ```bash
 cd book-service
-node server.js
+npm install
 ```
-Akan berjalan di `http://localhost:4001`
 
-**2. Jalankan Loan Service** (terminal 2, biarkan Book Service tetap jalan):
+```bash
+cd ../loan-service
+npm install
+```
+
+```bash
+cd ../api-gateway
+npm install
+```
+
+Dependency utama:
+
+- `mysql2` untuk koneksi MySQL pada Book Service dan Loan Service.
+- `dotenv` untuk membaca environment variable.
+
+## 14. Cara Konfigurasi `.env`
+
+Jangan menggunakan file `.env` yang dibagikan ke repository. Salin masing-masing `.env.example` menjadi `.env`.
+
+### Book Service
+
+```env
+PORT=4001
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=book_db
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+```
+
+### Loan Service
+
+```env
+PORT=4002
+BOOK_SERVICE_HOST=localhost
+BOOK_SERVICE_PORT=4001
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=loan_db
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+```
+
+### API Gateway
+
+```env
+PORT=4000
+BOOK_SERVICE_HOST=localhost
+BOOK_SERVICE_PORT=4001
+LOAN_SERVICE_HOST=localhost
+LOAN_SERVICE_PORT=4002
+API_KEY=your_api_key_here
+```
+
+File `.env` sudah dimasukkan ke `.gitignore`.
+
+## 15. Cara Menjalankan Database
+
+Buat dua database MySQL:
+
+```sql
+CREATE DATABASE book_db CHARACTER SET utf8mb4;
+CREATE DATABASE loan_db CHARACTER SET utf8mb4;
+```
+
+Kemudian jalankan migration dari masing-masing service:
+
+```bash
+cd book-service
+npm run migrate
+```
+
 ```bash
 cd loan-service
-node server.js
+npm run migrate
 ```
-Akan berjalan di `http://localhost:4002`
 
-**3. Buka Frontend**
-Buka file `frontend/index.html` langsung di browser (double click), atau jalankan
-live server sederhana:
+Migration membaca data lama dari `books.json` dan `loans.json`, membuat tabel yang diperlukan, lalu melakukan upsert ke MySQL.
+
+## 16. Cara Menjalankan Setiap Service
+
+### Book Service
+
 ```bash
-cd frontend
-npx serve .
+cd book-service
+npm start
 ```
 
-## API Endpoints
+Port:
 
-### Book Service (`:4001`)
-| Method | Endpoint | Keterangan |
-|---|---|---|
-| GET | `/books` | Daftar semua buku |
-| GET | `/books/:id` | Detail satu buku |
-| PATCH | `/books/:id/status` | Ubah status (`tersedia`/`dipinjam`) |
+```text
+http://localhost:4001
+```
 
-### Loan Service (`:4002`)
-| Method | Endpoint | Keterangan |
-|---|---|---|
-| POST | `/login` | Login (body: `{ "username": "..." }`) |
-| GET | `/loans/:username` | Daftar peminjaman aktif mahasiswa |
-| POST | `/loans` | Pinjam buku (body: `{ "username", "bookId" }`) |
+### Loan Service
 
-## Alur Fitur Utama (melibatkan 2 service)
-1. Frontend memanggil `POST /loans` ke **Loan Service**.
-2. **Loan Service** mengecek jumlah buku aktif mahasiswa (data sendiri)..
-3. **Loan Service** memanggil `GET /books/:id` ke **Book Service** untuk memastikan buku tersedia.
-4. Jika lolos, Loan Service mencatat peminjaman lalu memanggil `PATCH /books/:id/status`
-   ke Book Service untuk mengubah status buku menjadi `dipinjam`.
-5. Jika update Book Service gagal, Loan Service melakukan rollback pencatatan peminjaman
-   (menjaga konsistensi data antar-service).
+Pastikan Book Service dan MySQL tersedia terlebih dahulu.
 
-## User Story & Acceptance Criteria
-Menggunakan ulang User Story dan Acceptance Criteria dari Praktikum RE dengan AI
-sebelumnya (US-01, US-02, US-03, AC-01, AC-02, AC-03).
-| ID | User Story |
+```bash
+cd loan-service
+npm start
+```
+
+Port:
+
+```text
+http://localhost:4002
+```
+
+## 17. Cara Menjalankan API Gateway
+
+Pastikan Book Service dan Loan Service sudah berjalan.
+
+```bash
+cd api-gateway
+npm start
+```
+
+Gateway:
+
+```text
+http://localhost:4000
+```
+
+## 18. Cara Menjalankan Frontend
+
+Frontend berada di folder `frontend` dan menggunakan Gateway:
+
+```text
+http://localhost:4000
+```
+
+`frontend/script.js` tidak memanggil port `4001` atau `4002` secara langsung.
+
+Frontend dapat dibuka menggunakan web server lokal sederhana atau Live Server di VS Code.
+
+## 19. Cara Menggunakan API melalui Postman
+
+Import collection:
+
+```text
+postman/Sistem-Perpustakaan.postman_collection.json
+```
+
+Atur variable:
+
+```text
+baseUrl = http://localhost:4000
+apiKey = API_KEY dari api-gateway/.env
+```
+
+Untuk request yang membutuhkan authentication, gunakan:
+
+```text
+X-API-Key: {{apiKey}}
+```
+
+Collection berisi request untuk:
+
+- `GET /api/books`
+- `GET /api/books/:id`
+- `POST /api/loans`
+- `GET /api/loans/:username`
+
+Skenario error juga didokumentasikan di `docs/postman-testing.md`.
+
+## 20. Contoh API Request
+
+### Melihat daftar buku
+
+```http
+GET http://localhost:4000/api/books
+X-API-Key: <API_KEY>
+```
+
+### Meminjam buku
+
+```http
+POST http://localhost:4000/api/loans
+X-API-Key: <API_KEY>
+Content-Type: application/json
+```
+
+```json
+{
+  "username": "kokop",
+  "bookId": 2
+}
+```
+
+## 21. Contoh API Response
+
+Contoh daftar buku:
+
+```json
+[
+  {
+    "id": 2,
+    "title": "Bumbu Kacang Asli dari Kebumen",
+    "author": "Mas Narji",
+    "status": "tersedia"
+  }
+]
+```
+
+Contoh peminjaman berhasil:
+
+```json
+{
+  "message": "Buku berhasil dipinjam.",
+  "loan": {
+    "id": 1790211757128,
+    "username": "kokop",
+    "bookId": 2,
+    "bookTitle": "Bumbu Kacang Asli dari Kebumen",
+    "borrowDate": "2026-10-01T06:30:00.000Z",
+    "dueDate": "2026-10-08T06:30:00.000Z"
+  }
+}
+```
+
+Nilai ID dan tanggal pada response nyata dibuat saat request berlangsung.
+
+## 22. Alur Peminjaman Buku
+
+```text
+Client / Postman
+      |
+      | POST /api/loans + X-API-Key
+      v
+API Gateway :4000
+      |
+      | POST /loans
+      v
+Loan Service :4002
+      |
+      | GET /books/:id
+      v
+Book Service :4001
+      |
+      v
+Book MySQL (`book_db`)
+      |
+      | data + status buku
+      v
+Loan Service
+      |
+      | INSERT loan
+      v
+Loan MySQL (`loan_db`)
+      |
+      | PATCH /books/:id/status
+      v
+Book Service -> Book MySQL (`book_db`)
+      |
+      v
+Loan Service -> API Gateway -> Client
+```
+
+Jika update status buku gagal setelah loan tersimpan, Loan Service menghapus kembali transaksi loan tersebut sebagai rollback.
+
+## 23. Cara Testing
+
+Testing API dilakukan menggunakan Postman Collection:
+
+```text
+postman/Sistem-Perpustakaan.postman_collection.json
+```
+
+Skenario yang didokumentasikan meliputi:
+
+- API Key benar;
+- API Key salah;
+- API Key tidak dikirim;
+- buku ditemukan;
+- buku tidak ditemukan;
+- buku tersedia;
+- buku sedang dipinjam;
+- data peminjaman tidak lengkap;
+- Book Service tidak tersedia;
+- Loan Service tidak tersedia; dan
+- database error jika kondisi database dapat disimulasikan.
+
+Detail expected status dan response terdapat pada `docs/postman-testing.md`.
+
+Selain itu, syntax source utama telah diperiksa selama pengembangan. Pengujian MySQL penuh harus dilakukan pada environment yang memiliki MySQL aktif dan kredensial yang sesuai.
+
+## 24. Kontribusi Anggota Kelompok
+
+Anggota kelompok yang tercantum pada project:
+
+| Anggota | Kontribusi |
 |---|---|
-| US-01 | Sebagai mahasiswa, saya ingin meminjam buku informatika dasar sehingga dapat memahami ilmu informatika. |
-| US-02 | Sebagai mahasiswa, saya ingin melihat buku sistem informasi yang masih tersedia sehingga saya bisa menetukan buku yang ingin dipinjam. |
-| US-03 | Sebagai mahasiswa, saya ingin meminjam buku programming sehingga dapat memahami dan melakukan pemrograman. |
+| Shandy Aulia | Pengembangan project kelompok |
+| Sri Maharani | Pengembangan project kelompok |
+| Putra Aji Pratama | Pengembangan project kelompok |
+| Muhammad Lutfi Rivani | Pengembangan project kelompok |
+| Lia Saripah | Pengembangan project kelompok |
 
-| No | Given / Kondisi | When / Aksi | Then / Hasil |
-|---|---|---|---|
-| AC-01 | Mahasiswa sudah login dan buku berstatus tersedia	 | Mahasiswa memilih tombol pinjam | Buku berhasil dipinjam dan statusnya berubah menjadi dipinjam |
-| AC-02 | Mahasiswa sudah memiliki 3 buku aktif	| Mahasiswa mencoba meminjam buku lain | Peminjaman ditolak oleh sistem |
-| AC-03 | Buku berstatus sedang dipinjam mahasiswa lain	| Mahasiswa mencoba meminjam buku tersebut | Peminjaman ditolak oleh sistem |
+Pembagian tugas individual yang lebih rinci tidak tercatat di source project yang digunakan untuk dokumentasi ini, sehingga dokumentasi tidak mengklaim pembagian tugas spesifik yang tidak dapat diverifikasi.
 
-## Dokumentasi Penggunaan AI Coding Tool
-Lihat [`docs/ai-usage.md`](docs/ai-usage.md) dan [`docs/prompts.md`](docs/prompts.md)
-untuk penjelasan bagaimana AI digunakan dalam pengembangan, serta masalah yang
-ditemukan dan diperbaiki dari hasil AI.
+---
+
+## Dokumentasi Tambahan
+
+- [Architecture](docs/architecture.md)
+- [AI Usage](docs/ai-usage.md)
+- [Prompts](docs/prompts.md)
+- [E2E Loan Flow](docs/e2e-loan-flow.md)
+- [Postman Testing](docs/postman-testing.md)
