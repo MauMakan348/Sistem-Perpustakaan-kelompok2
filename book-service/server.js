@@ -1,28 +1,14 @@
 // =========================================================
 // BOOK SERVICE
 // Tanggung jawab: menyimpan data buku & status ketersediaannya.
-// Service ini TIDAK tahu apa-apa soal mahasiswa/peminjaman —
-// itu tanggung jawab Loan Service.
-//
-// Ditulis hanya dengan modul bawaan Node.js (http, fs) supaya
-// bisa langsung dijalankan dengan `node server.js` tanpa
-// perlu `npm install`.
+// Persistence: MySQL book_db milik Book Service.
 // =========================================================
 
+require("dotenv").config();
 const http = require("http");
-const fs = require("fs");
-const path = require("path");
+const { pool, checkDatabaseConnection } = require("./db");
 
 const PORT = process.env.PORT || 4001;
-const DB_FILE = path.join(__dirname, "books.json");
-
-function readBooks() {
-  return JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
-}
-
-function writeBooks(books) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(books, null, 2));
-}
 
 function sendJSON(res, statusCode, data) {
   const body = JSON.stringify(data);
@@ -53,60 +39,96 @@ function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
-  const segments = url.pathname.split("/").filter(Boolean); // ["books", ":id", "status"]
+  const segments = url.pathname.split("/").filter(Boolean);
 
-  // Preflight CORS
   if (req.method === "OPTIONS") {
     return sendJSON(res, 204, {});
   }
 
-  // ---------------------------------------------------
-  // GET /books -> daftar semua buku
-  // ---------------------------------------------------
-  if (req.method === "GET" && segments.length === 1 && segments[0] === "books") {
-    return sendJSON(res, 200, readBooks());
-  }
-
-  // ---------------------------------------------------
-  // GET /books/:id -> detail satu buku
-  // ---------------------------------------------------
-  if (req.method === "GET" && segments.length === 2 && segments[0] === "books") {
-    const id = Number(segments[1]);
-    const book = readBooks().find(b => b.id === id);
-    if (!book) return sendJSON(res, 404, { error: "Buku tidak ditemukan." });
-    return sendJSON(res, 200, book);
-  }
-
-  // ---------------------------------------------------
-  // PATCH /books/:id/status -> ubah status buku
-  // Dipanggil oleh Loan Service saat buku dipinjam.
-  // Body: { "status": "tersedia" | "dipinjam" }
-  // ---------------------------------------------------
-  if (req.method === "PATCH" && segments.length === 3 && segments[0] === "books" && segments[2] === "status") {
-    let body;
-    try {
-      body = await readBody(req);
-    } catch {
-      return sendJSON(res, 400, { error: "Body JSON tidak valid." });
+  try {
+    // GET /books -> daftar semua buku
+    if (req.method === "GET" && segments.length === 1 && segments[0] === "books") {
+      const [rows] = await pool.query(
+        "SELECT id, title, author, status FROM books ORDER BY id"
+      );
+      return sendJSON(res, 200, rows);
     }
 
-    if (!["tersedia", "dipinjam"].includes(body.status)) {
-      return sendJSON(res, 400, { error: "Status tidak valid." });
+    // GET /books/:id -> detail satu buku
+    if (req.method === "GET" && segments.length === 2 && segments[0] === "books") {
+      const id = Number(segments[1]);
+      if (!Number.isInteger(id)) {
+        return sendJSON(res, 400, { error: "ID buku tidak valid." });
+      }
+
+      const [rows] = await pool.execute(
+        "SELECT id, title, author, status FROM books WHERE id = ?",
+        [id]
+      );
+      if (rows.length === 0) {
+        return sendJSON(res, 404, { error: "Buku tidak ditemukan." });
+      }
+      return sendJSON(res, 200, rows[0]);
     }
 
-    const id = Number(segments[1]);
-    const books = readBooks();
-    const book = books.find(b => b.id === id);
-    if (!book) return sendJSON(res, 404, { error: "Buku tidak ditemukan." });
+    // PATCH /books/:id/status -> ubah status buku
+    if (
+      req.method === "PATCH" &&
+      segments.length === 3 &&
+      segments[0] === "books" &&
+      segments[2] === "status"
+    ) {
+      let body;
+      try {
+        body = await readBody(req);
+      } catch {
+        return sendJSON(res, 400, { error: "Body JSON tidak valid." });
+      }
 
-    book.status = body.status;
-    writeBooks(books);
-    return sendJSON(res, 200, { message: "Status buku diperbarui.", book });
+      if (!["tersedia", "dipinjam"].includes(body.status)) {
+        return sendJSON(res, 400, { error: "Status tidak valid." });
+      }
+
+      const id = Number(segments[1]);
+      if (!Number.isInteger(id)) {
+        return sendJSON(res, 400, { error: "ID buku tidak valid." });
+      }
+
+      const [result] = await pool.execute(
+        "UPDATE books SET status = ? WHERE id = ?",
+        [body.status, id]
+      );
+
+      const [rows] = await pool.execute(
+        "SELECT id, title, author, status FROM books WHERE id = ?",
+        [id]
+      );
+      if (rows.length === 0) {
+        return sendJSON(res, 404, { error: "Buku tidak ditemukan." });
+      }
+      return sendJSON(res, 200, {
+        message: "Status buku diperbarui.",
+        book: rows[0],
+      });
+    }
+
+    return sendJSON(res, 404, { error: "Endpoint tidak ditemukan." });
+  } catch (error) {
+    console.error("[Book Service] database/request error:", error.message);
+    return sendJSON(res, 500, { error: "Terjadi kesalahan pada Book Service." });
   }
-
-  sendJSON(res, 404, { error: "Endpoint tidak ditemukan." });
 });
 
-server.listen(PORT, () => {
-  console.log(`[Book Service] berjalan di http://localhost:${PORT}`);
-});
+async function startServer() {
+  try {
+    await checkDatabaseConnection();
+    server.listen(PORT, () => {
+      console.log(`[Book Service] berjalan di http://localhost:${PORT}`);
+    });
+  } catch {
+    console.error("[Book Service] server tidak dijalankan karena MySQL tidak tersedia.");
+    process.exit(1);
+  }
+}
+
+startServer();

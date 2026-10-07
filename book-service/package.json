@@ -1,9 +1,14 @@
 {
   "name": "book-service",
   "version": "1.0.0",
-  "description": "Microservice untuk mengelola data buku perpustakaan (Node.js core http, tanpa dependency eksternal)",
+  "description": "Microservice untuk mengelola data buku perpustakaan dengan MySQL",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate": "node migrate.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "mysql2": "^3.14.0"
   }
 }
