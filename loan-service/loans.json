@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "id": 1790211757127,
+    "username": "kokop",
+    "bookId": 1,
+    "bookTitle": "Cara Membedakan Tangan Kanan dan Tangan Kiri",
+    "borrowDate": "2026-09-24T01:02:37.126Z",
+    "dueDate": "2026-10-01T01:02:37.126Z"
+  }
+]
