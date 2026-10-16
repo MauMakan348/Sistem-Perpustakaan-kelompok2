@@ -118,3 +118,36 @@ td button:disabled {
   background: #9ca3af;
   cursor: not-allowed;
 }
+
+/* ---------- AUTH FORMS ---------- */
+.card {
+  width: min(420px, calc(100% - 32px));
+  text-align: left;
+}
+
+.card h1,
+.card .subtitle,
+.card .hint,
+#authMessage {
+  text-align: center;
+}
+
+.card form h2 {
+  margin: 12px 0 16px;
+  font-size: 17px;
+}
+
+.card form button {
+  margin-bottom: 4px;
+}
+
+.card hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 24px 0;
+}
+
+#authMessage {
+  min-height: 18px;
+  font-size: 13px;
+}

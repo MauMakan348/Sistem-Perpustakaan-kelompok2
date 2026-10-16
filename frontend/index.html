@@ -2,6 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistem Peminjaman Buku Perpustakaan (Microservice)</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -10,10 +11,29 @@
   <section id="loginScreen" class="screen">
     <div class="card">
       <h1>📚 Perpustakaan Kampus</h1>
-      <p class="subtitle">Login untuk melihat & meminjam buku</p>
-      <label for="namaInput">Nama Mahasiswa</label>
-      <input type="text" id="namaInput" placeholder="Contoh: Rina Amelia" />
-      <button id="btnLogin">Login</button>
+      <p class="subtitle">Masuk atau buat akun untuk meminjam buku</p>
+
+      <form id="loginForm">
+        <h2>Login</h2>
+        <label for="loginUsername">Username</label>
+        <input type="text" id="loginUsername" autocomplete="username" minlength="3" maxlength="32" required placeholder="Username">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" required placeholder="Password">
+        <button type="submit" id="btnLogin">Login</button>
+      </form>
+
+      <hr>
+
+      <form id="registerForm">
+        <h2>Registrasi</h2>
+        <label for="registerUsername">Username</label>
+        <input type="text" id="registerUsername" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9_]{3,32}" required placeholder="3-32 huruf, angka, atau underscore">
+        <label for="registerPassword">Password</label>
+        <input type="password" id="registerPassword" autocomplete="new-password" minlength="8" maxlength="72" required placeholder="Minimal 8 karakter">
+        <button type="submit" id="btnRegister">Buat Akun</button>
+      </form>
+      <p class="hint">Password disimpan dalam bentuk hash di database server. Jangan gunakan password penting milik akun lain.</p>
+      <p id="authMessage" role="status" aria-live="polite"></p>
     </div>
   </section>
 

@@ -72,7 +72,7 @@ Client menggunakan Gateway `:4000`. Port `:4001` dan `:4002` merupakan port serv
 |---|---:|---|
 | API Gateway | 4000 | Entry point client, API Key authentication, routing dan forwarding |
 | Book Service | 4001 | Data buku dan status ketersediaan buku |
-| Loan Service | 4002 | Login, transaksi peminjaman, batas 3 buku aktif dan jatuh tempo 7 hari |
+| Loan Service | 4002 | Registrasi/login pengguna, JWT, transaksi peminjaman, batas 3 buku aktif dan jatuh tempo 7 hari |
 
 ## 7. Fungsi Setiap Service
 
@@ -94,7 +94,7 @@ Client menggunakan Gateway `:4000`. Port `:4001` dan `:4002` merupakan port serv
 
 ### Loan Service
 
-- Login sederhana berdasarkan username.
+- Registrasi akun dengan password hash dan login menggunakan username/password; login menghasilkan JWT Bearer dengan masa berlaku.
 - Mengambil daftar peminjaman aktif mahasiswa.
 - Memvalidasi transaksi peminjaman.
 - Membatasi maksimal 3 peminjaman aktif.
@@ -117,11 +117,12 @@ Endpoint publik yang tersedia:
 | GET | `/api/books` | Daftar buku |
 | GET | `/api/books/:id` | Detail buku |
 | PATCH | `/api/books/:id/status` | Mengubah status buku |
-| POST | `/api/login` | Login sederhana |
+| POST | `/api/register` | Registrasi pengguna |
+| POST | `/api/login` | Login pengguna dan memperoleh JWT |
 | GET | `/api/loans/:username` | Peminjaman aktif |
 | POST | `/api/loans` | Membuat peminjaman |
 
-Gateway meneruskan route ke endpoint internal yang sesuai. Client tidak perlu memanggil `:4001` atau `:4002` secara langsung.
+Gateway meneruskan route ke endpoint internal yang sesuai. Client tidak perlu memanggil `:4001` atau `:4002` secara langsung. Book Service dan Loan Service listen pada loopback `127.0.0.1` untuk konfigurasi lokal.
 
 ## 9. Database
 
@@ -171,6 +172,15 @@ Jika key tidak ada atau salah, Gateway mengembalikan:
 
 API Key tidak disimpan di frontend public. Pengujian API dengan key dilakukan melalui Postman.
 
+## Autentikasi Pengguna
+
+- `POST /api/register` menerima `username` dan `password`; username unik dan password disimpan sebagai bcrypt hash di tabel `users` milik `loan_db`.
+- `POST /api/login` memeriksa kredensial dan mengembalikan JWT Bearer dengan masa berlaku. Password hash tidak dikirim dalam response.
+- Endpoint transaksi Loan Service memvalidasi JWT dan mengikat username transaksi dengan identitas di token.
+- API Key `X-API-Key` tetap menjadi mekanisme akses Gateway untuk client tepercaya seperti Postman. API Key bukan identitas pengguna dan tidak menggantikan JWT.
+- Registrasi/login tidak meminta API Key supaya browser dapat memulai sesi tanpa menyimpan secret Gateway. Route lain dapat diakses menggunakan API Key yang benar atau JWT valid; endpoint peminjaman tetap membutuhkan JWT valid di Loan Service.
+- JWT disimpan sementara pada `sessionStorage` browser, bukan sebagai database pengguna. `JWT_SECRET` harus sama pada konfigurasi lokal API Gateway dan Loan Service dan tidak boleh ditaruh di frontend/Git.
+
 ## 11. Technology Stack
 
 | Bagian | Teknologi |
@@ -179,6 +189,8 @@ API Key tidak disimpan di frontend public. Pengujian API dengan key dilakukan me
 | Gateway | Node.js native HTTP |
 | Database | MySQL |
 | Database driver | `mysql2` |
+| Password hashing | `bcryptjs` |
+| User token | `jsonwebtoken` (JWT) |
 | Environment configuration | `dotenv` |
 | Frontend | HTML5, CSS3, Vanilla JavaScript |
 | API testing | Postman |
@@ -259,6 +271,8 @@ Dependency utama:
 
 - `mysql2` untuk koneksi MySQL pada Book Service dan Loan Service.
 - `dotenv` untuk membaca environment variable.
+- `bcryptjs` untuk hashing password pengguna.
+- `jsonwebtoken` untuk membuat dan memverifikasi JWT.
 
 ## 14. Cara Konfigurasi `.env`
 
@@ -279,24 +293,27 @@ DB_PASSWORD=your_mysql_password
 
 ```env
 PORT=4002
-BOOK_SERVICE_HOST=localhost
+BOOK_SERVICE_HOST=127.0.0.1
 BOOK_SERVICE_PORT=4001
 DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=loan_db
 DB_USER=root
 DB_PASSWORD=your_mysql_password
+JWT_SECRET=replace_with_a_long_random_secret_at_least_32_bytes
+JWT_EXPIRES_IN=2h
 ```
 
 ### API Gateway
 
 ```env
 PORT=4000
-BOOK_SERVICE_HOST=localhost
+BOOK_SERVICE_HOST=127.0.0.1
 BOOK_SERVICE_PORT=4001
-LOAN_SERVICE_HOST=localhost
+LOAN_SERVICE_HOST=127.0.0.1
 LOAN_SERVICE_PORT=4002
 API_KEY=your_api_key_here
+JWT_SECRET=replace_with_the_same_long_random_secret_as_loan_service
 ```
 
 File `.env` sudah dimasukkan ke `.gitignore`.

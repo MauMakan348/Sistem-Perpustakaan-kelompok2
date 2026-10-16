@@ -1,14 +1,17 @@
 {
   "name": "loan-service",
   "version": "1.0.0",
-  "description": "Microservice untuk login mahasiswa dan peminjaman buku dengan MySQL",
+  "description": "Microservice untuk registrasi/login pengguna dan peminjaman buku dengan MySQL",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "migrate": "node migrate.js"
+    "migrate": "node migrate.js",
+    "test": "node --test"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.0"
   }
 }

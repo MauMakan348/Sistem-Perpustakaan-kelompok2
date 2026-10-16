@@ -54,8 +54,11 @@ Gateway merupakan satu-satunya entry point API untuk client.
 
 Tanggung jawabnya:
 
-- membaca `X-API-Key`;
-- menolak request dengan API Key tidak ada atau salah menggunakan HTTP `401`;
+- meneruskan registrasi/login ke Loan Service tanpa meminta credential agar browser dapat memulai sesi;
+- menerima `X-API-Key` untuk client tepercaya seperti Postman;
+- memverifikasi JWT Bearer untuk route pengguna yang diizinkan;
+- menolak request lain tanpa API Key valid atau JWT yang diizinkan menggunakan HTTP `401`;
+- meneruskan header `Authorization` ke service tujuan;
 - menentukan service tujuan berdasarkan path;
 - meneruskan HTTP method;
 - meneruskan body;
@@ -86,7 +89,9 @@ PATCH /books/:id/status
 
 Loan Service bertanggung jawab atas:
 
-- login sederhana;
+- registrasi pengguna dan login username/password;
+- hashing password menggunakan bcrypt;
+- penerbitan dan validasi JWT dengan masa berlaku;
 - transaksi peminjaman;
 - maksimal 3 peminjaman aktif per mahasiswa;
 - masa peminjaman 7 hari;
@@ -96,10 +101,13 @@ Loan Service bertanggung jawab atas:
 Endpoint internal:
 
 ```text
+POST /register
 POST /login
-GET  /loans/:username
-POST /loans
+GET  /loans/:username   (JWT wajib)
+POST /loans             (JWT wajib)
 ```
+
+Book Service dan Loan Service diikat ke loopback `127.0.0.1` pada konfigurasi lokal sehingga tidak listen pada interface jaringan eksternal. Client menggunakan Gateway `:4000`.
 
 ## 3. Public Routing pada Gateway
 
@@ -108,6 +116,7 @@ POST /loans
 | `GET /api/books` | Book Service `GET /books` |
 | `GET /api/books/:id` | Book Service `GET /books/:id` |
 | `PATCH /api/books/:id/status` | Book Service `PATCH /books/:id/status` |
+| `POST /api/register` | Loan Service `POST /register` |
 | `POST /api/login` | Loan Service `POST /login` |
 | `GET /api/loans/:username` | Loan Service `GET /loans/:username` |
 | `POST /api/loans` | Loan Service `POST /loans` |
@@ -190,7 +199,15 @@ Validasi dilakukan sebelum request diteruskan ke service tujuan. Jika header tid
 
 API Key tidak ditanam di frontend public.
 
-## 7. End-to-End Flow: Peminjaman Buku
+## 7. Autentikasi Pengguna
+
+Tabel `users` dimiliki Loan Service di `loan_db` dan berisi `id`, `username` unik, `password_hash`, serta `created_at`. Migration memeriksa keberadaan tabel dan kolom yang dibutuhkan sebelum membuat tabel baru; migration tidak menghapus data pengguna yang ada.
+
+`POST /api/register` menerima username dan password, menyimpan password sebagai bcrypt hash, dan tidak mengembalikan hash. `POST /api/login` memverifikasi hash dan menerbitkan JWT dengan expiry. `JWT_SECRET` harus sama pada konfigurasi API Gateway dan Loan Service, tetapi tidak boleh berada di frontend.
+
+`X-API-Key` adalah credential client untuk Gateway. JWT adalah identitas pengguna. API Key tidak menggantikan JWT untuk endpoint transaksi; Loan Service memvalidasi token dan mengikat username pada path/body ke identitas token.
+
+## 8. End-to-End Flow: Peminjaman Buku
 
 ```text
 Client

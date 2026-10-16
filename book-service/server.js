@@ -122,8 +122,8 @@ const server = http.createServer(async (req, res) => {
 async function startServer() {
   try {
     await checkDatabaseConnection();
-    server.listen(PORT, () => {
-      console.log(`[Book Service] berjalan di http://localhost:${PORT}`);
+    server.listen(PORT, "127.0.0.1", () => {
+      console.log(`[Book Service] berjalan di http://127.0.0.1:${PORT}`);
     });
   } catch {
     console.error("[Book Service] server tidak dijalankan karena MySQL tidak tersedia.");
