@@ -391,7 +391,7 @@ const server = http.createServer(async (req, res) => {
       const dueDate = new Date(borrowDate);
       dueDate.setDate(dueDate.getDate() + LOAN_PERIOD_DAYS);
       const newLoan = {
-        id: Date.now(),
+        id: Date.now() * 1000 + Math.floor(Math.random() * 1000),
         username: authenticatedUser.username,
         bookId: numericBookId,
         bookTitle: book.title,
@@ -399,24 +399,71 @@ const server = http.createServer(async (req, res) => {
         dueDate: dueDate.toISOString(),
       };
 
-      await pool.execute(
-        `INSERT INTO loans (id, username, book_id, book_title, borrow_date, due_date)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [newLoan.id, newLoan.username, newLoan.bookId, newLoan.bookTitle,
-          new Date(newLoan.borrowDate), new Date(newLoan.dueDate)]
-      );
-
+      // Reservasi status lebih dulu secara atomik di Book Service. Jika dua request
+      // berlomba, hanya satu PATCH tersedia -> dipinjam yang akan berhasil.
+      let reservation;
       try {
-        const updateResponse = await callBookService(
+        reservation = await callBookService(
           "PATCH", `/books/${numericBookId}/status`, { status: "dipinjam" }
         );
-        if (updateResponse.statusCode !== 200) throw new Error("Update status gagal");
       } catch {
-        await pool.execute("DELETE FROM loans WHERE id = ?", [newLoan.id]);
-        return sendJSON(res, 502, { error: "Gagal memperbarui status buku di Book Service." });
+        // Respons bisa hilang setelah Book Service berhasil mengubah status.
+        // Coba pulihkan status; jika tidak berhasil, catat agar dapat direkonsiliasi.
+        try {
+          const compensation = await callBookService(
+            "PATCH", `/books/${numericBookId}/status`, { status: "tersedia" }
+          );
+          if (compensation.statusCode !== 200) {
+            console.error("[Loan Service] status reservasi tidak dapat dipastikan; perlu rekonsiliasi manual.");
+          }
+        } catch {
+          console.error("[Loan Service] Book Service tidak tersedia untuk kompensasi reservasi; perlu rekonsiliasi manual.");
+        }
+        return sendJSON(res, 502, { error: "Book Service tidak dapat dipastikan saat memesan buku." });
+      }
+      if (reservation.statusCode === 409) {
+        return sendJSON(res, 409, { error: "Peminjaman ditolak. Buku sudah tidak tersedia." });
+      }
+      if (reservation.statusCode !== 200) {
+        if (reservation.statusCode !== 404) {
+          try {
+            const compensation = await callBookService(
+              "PATCH", `/books/${numericBookId}/status`, { status: "tersedia" }
+            );
+            if (compensation.statusCode !== 200) {
+              console.error("[Loan Service] kompensasi status reservasi gagal; perlu rekonsiliasi manual.");
+            }
+          } catch {
+            console.error("[Loan Service] kompensasi status reservasi tidak dapat dijalankan; perlu rekonsiliasi manual.");
+          }
+        }
+        return sendJSON(res, reservation.statusCode === 404 ? 404 : 502,
+          { error: "Book Service gagal memesan buku." });
       }
 
-      return sendJSON(res, 201, { message: "Buku berhasil dipinjam.", loan: newLoan });
+      try {
+        await pool.execute(
+          `INSERT INTO loans (id, username, book_id, book_title, borrow_date, due_date, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'active')`,
+          [newLoan.id, newLoan.username, newLoan.bookId, newLoan.bookTitle,
+            new Date(newLoan.borrowDate), new Date(newLoan.dueDate)]
+        );
+      } catch (error) {
+        // Kompensasi bila penyimpanan transaksi gagal setelah status buku direservasi.
+        try {
+          const compensation = await callBookService(
+            "PATCH", `/books/${numericBookId}/status`, { status: "tersedia" }
+          );
+          if (compensation.statusCode !== 200) {
+            console.error("[Loan Service] kompensasi peminjaman gagal; perlu rekonsiliasi manual.");
+          }
+        } catch {
+          console.error("[Loan Service] Book Service tidak tersedia untuk kompensasi peminjaman; perlu rekonsiliasi manual.");
+        }
+        throw error;
+      }
+
+      return sendJSON(res, 201, { message: "Buku berhasil dipinjam.", loan: { ...newLoan, status: "active" } });
     }
 
     return sendJSON(res, 404, { error: "Endpoint tidak ditemukan." });

@@ -126,9 +126,11 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: "ID buku tidak valid." });
       }
 
+      // Transisi status atomik: hanya satu request yang dapat mengambil buku tersedia.
+      const expectedCurrentStatus = body.status === "dipinjam" ? "tersedia" : "dipinjam";
       const [result] = await pool.execute(
-        "UPDATE books SET status = ? WHERE id = ?",
-        [body.status, id]
+        "UPDATE books SET status = ? WHERE id = ? AND status = ?",
+        [body.status, id, expectedCurrentStatus]
       );
 
       const [rows] = await pool.execute(
@@ -138,9 +140,15 @@ const server = http.createServer(async (req, res) => {
       if (rows.length === 0) {
         return sendJSON(res, 404, { error: "Buku tidak ditemukan." });
       }
+      if (result.affectedRows !== 1) {
+        return sendJSON(res, 409, {
+          error: `Transisi status ditolak. Status buku saat ini: ${rows[0].status}.`,
+          book: rows[0],
+        });
+      }
       return sendJSON(res, 200, {
         message: "Status buku diperbarui.",
-        book: rows[0],
+        book: { ...rows[0], status: body.status },
       });
     }
 
