@@ -11,6 +11,22 @@ async function migrate() {
 
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   const statements = schema.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
+  const [loansTableRows] = await pool.query(
+    `SELECT COUNT(*) AS tableCount FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'loans'`
+  );
+  const loansTableExists = Number(loansTableRows[0].tableCount) > 0;
+  if (loansTableExists) {
+    const [loanColumns] = await pool.query("SHOW COLUMNS FROM loans");
+    const existing = new Set(loanColumns.map(column => column.Field));
+    if (!existing.has("status")) {
+      await pool.query("ALTER TABLE loans ADD COLUMN status ENUM('active', 'returned') NOT NULL DEFAULT 'active'");
+    }
+    if (!existing.has("returned_at")) {
+      await pool.query("ALTER TABLE loans ADD COLUMN returned_at DATETIME(3) NULL");
+    }
+    // Data historis tetap dipertahankan; transaksi lama dianggap aktif sampai dikembalikan melalui API.
+  }
   const [userTableRows] = await pool.query(
     `SELECT COUNT(*) AS tableCount
      FROM information_schema.tables

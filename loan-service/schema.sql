@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS loans (
   book_title TEXT NOT NULL,
   borrow_date DATETIME(3) NOT NULL,
   due_date DATETIME(3) NOT NULL,
+  status ENUM('active', 'returned') NOT NULL DEFAULT 'active',
+  returned_at DATETIME(3) NULL,
   INDEX idx_loans_username (username),
   INDEX idx_loans_due_date (due_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

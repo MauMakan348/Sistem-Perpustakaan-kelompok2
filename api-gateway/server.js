@@ -89,7 +89,8 @@ function isUserTokenRoute(req, pathname) {
   if (req.method === "GET" && (pathname === "/api/books" || pathname.startsWith("/api/books/") || pathname.startsWith("/api/loans/"))) {
     return true;
   }
-  return req.method === "POST" && pathname === "/api/loans";
+  if (req.method === "POST" && pathname === "/api/loans") return true;
+  return req.method === "POST" && /^\/api\/loans\/\d+\/return$/.test(pathname);
 }
 
 function forwardRequest(req, res, target, body) {

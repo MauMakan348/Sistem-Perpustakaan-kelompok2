@@ -103,8 +103,19 @@ async function getActiveLoansForUser(username) {
     `SELECT id, username, book_id AS bookId, book_title AS bookTitle,
             borrow_date AS borrowDate, due_date AS dueDate
      FROM loans
-     WHERE username = ? AND due_date >= UTC_TIMESTAMP()
+     WHERE username = ? AND status = 'active'
      ORDER BY borrow_date DESC`,
+    [username]
+  );
+  return rows;
+}
+
+async function getLoansForUser(username) {
+  const [rows] = await pool.execute(
+    `SELECT id, username, book_id AS bookId, book_title AS bookTitle,
+            borrow_date AS borrowDate, due_date AS dueDate,
+            status, returned_at AS returnedAt
+     FROM loans WHERE username = ? ORDER BY borrow_date DESC`,
     [username]
   );
   return rows;
@@ -214,8 +225,124 @@ const server = http.createServer(async (req, res) => {
       if (requestedUsername !== authenticatedUser.username) {
         return sendJSON(res, 403, { error: "Anda tidak berhak melihat peminjaman pengguna lain." });
       }
-      const activeLoans = await getActiveLoansForUser(authenticatedUser.username);
-      return sendJSON(res, 200, activeLoans);
+      const loans = await getLoansForUser(authenticatedUser.username);
+      return sendJSON(res, 200, loans);
+    }
+
+    // POST /loans/:id/return -> hanya pemilik transaksi dapat mengembalikan.
+    // Row lock mencegah dua request mengembalikan transaksi yang sama bersamaan.
+    if (req.method === "POST" && segments.length === 3 && segments[0] === "loans" && segments[2] === "return") {
+      const loanId = segments[1];
+      if (!/^\d+$/.test(loanId) || !Number.isSafeInteger(Number(loanId)) || Number(loanId) <= 0) {
+        return sendJSON(res, 400, { error: "ID transaksi tidak valid." });
+      }
+
+      let connection;
+      let bookMarkedAvailable = false;
+      let bookIdToCompensate = null;
+      try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+        const [rows] = await connection.execute(
+          `SELECT id, username, book_id AS bookId, book_title AS bookTitle, status
+           FROM loans WHERE id = ? FOR UPDATE`,
+          [loanId]
+        );
+        if (rows.length === 0) {
+          await connection.rollback();
+          return sendJSON(res, 404, { error: "Transaksi peminjaman tidak ditemukan." });
+        }
+        const loan = rows[0];
+        if (loan.username !== authenticatedUser.username) {
+          await connection.rollback();
+          return sendJSON(res, 403, { error: "Anda tidak berhak mengembalikan transaksi pengguna lain." });
+        }
+        if (loan.status === "returned") {
+          await connection.rollback();
+          return sendJSON(res, 409, { error: "Transaksi ini sudah dikembalikan." });
+        }
+        if (loan.status !== "active") {
+          await connection.rollback();
+          return sendJSON(res, 409, { error: "Status transaksi tidak memungkinkan pengembalian." });
+        }
+
+        bookIdToCompensate = Number(loan.bookId);
+        let bookResponse;
+        try {
+          bookResponse = await callBookService("GET", `/books/${bookIdToCompensate}`);
+        } catch {
+          await connection.rollback();
+          return sendJSON(res, 502, { error: "Book Service tidak dapat dihubungi; transaksi belum diubah." });
+        }
+        if (bookResponse.statusCode === 404) {
+          await connection.rollback();
+          return sendJSON(res, 502, { error: "Data buku tidak ditemukan di Book Service; transaksi belum diubah." });
+        }
+        if (bookResponse.statusCode !== 200) {
+          await connection.rollback();
+          return sendJSON(res, 502, { error: "Book Service mengembalikan error; transaksi belum diubah." });
+        }
+        if (bookResponse.body.status !== "dipinjam") {
+          await connection.rollback();
+          return sendJSON(res, 409, { error: "Status buku tidak sesuai dengan transaksi aktif; perlu pemeriksaan petugas." });
+        }
+
+        try {
+          const updateBook = await callBookService(
+            "PATCH", `/books/${bookIdToCompensate}/status`, { status: "tersedia" }
+          );
+          if (updateBook.statusCode !== 200) throw new Error("Book Service gagal mengubah status buku");
+          bookMarkedAvailable = true;
+        } catch {
+          await connection.rollback();
+          return sendJSON(res, 502, { error: "Book Service gagal memperbarui status buku; transaksi belum diubah." });
+        }
+
+        const [updateResult] = await connection.execute(
+          `UPDATE loans SET status = 'returned', returned_at = UTC_TIMESTAMP(3)
+           WHERE id = ? AND status = 'active'`,
+          [loanId]
+        );
+        if (updateResult.affectedRows !== 1) {
+          throw new Error("Transaksi tidak lagi aktif saat pembaruan status.");
+        }
+        const [returnedRows] = await connection.execute(
+          "SELECT returned_at AS returnedAt FROM loans WHERE id = ?",
+          [loanId]
+        );
+        await connection.commit();
+        return sendJSON(res, 200, {
+          message: "Buku berhasil dikembalikan.",
+          loan: {
+            id: loan.id,
+            username: loan.username,
+            bookId: loan.bookId,
+            bookTitle: loan.bookTitle,
+            status: "returned",
+            returnedAt: returnedRows[0].returnedAt,
+          },
+        });
+      } catch (error) {
+        if (connection) {
+          try { await connection.rollback(); } catch {}
+        }
+        // Kompensasi jika Book Service sudah mengubah status tetapi transaksi DB gagal.
+        if (bookMarkedAvailable && bookIdToCompensate !== null) {
+          try {
+            const compensation = await callBookService(
+              "PATCH", `/books/${bookIdToCompensate}/status`, { status: "dipinjam" }
+            );
+            if (compensation.statusCode !== 200) {
+              console.error("[Loan Service] kompensasi status buku gagal; perlu rekonsiliasi manual.");
+            }
+          } catch {
+            console.error("[Loan Service] Book Service tidak tersedia untuk kompensasi; perlu rekonsiliasi manual.");
+          }
+        }
+        throw error;
+      } finally {
+        if (connection) connection.release();
+      }
     }
 
     // POST /loans { bookId }; username berasal dari token, bukan body.
