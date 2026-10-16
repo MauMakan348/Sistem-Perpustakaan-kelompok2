@@ -160,3 +160,22 @@ td button:disabled {
 .inline-form button { background: #167647; color: white; border: 0; padding: 10px 14px; border-radius: 8px; cursor: pointer; }
 #addBookMessage { min-height: 18px; font-size: 13px; }
 @media (max-width: 800px) { .inline-form { grid-template-columns: 1fr; } }
+
+/* ---------- STATUS, LOADING, DAN RIWAYAT PENGEMBALIAN ---------- */
+.panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.panel-heading h2 { margin-bottom: 0; }
+.button-secondary { background: #e5e7eb; color: #1f2937; border: 1px solid #d1d5db; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.button-secondary:hover { background: #d1d5db; }
+.message { min-height: 18px; font-size: 13px; margin: 10px 0; overflow-wrap: anywhere; }
+.message-error { color: #b42318; }
+.message-success { color: #167647; }
+.empty-state { text-align: center; color: #6b7280; padding: 24px 12px; }
+.table-wrap { width: 100%; overflow-x: auto; }
+button:disabled { opacity: .65; cursor: wait; }
+@media (max-width: 800px) {
+  header { padding: 16px; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  main { padding: 16px; }
+  .panel { padding: 16px; }
+  .panel-heading { align-items: flex-start; flex-wrap: wrap; }
+  table { min-width: 620px; }
+}
