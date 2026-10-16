@@ -179,14 +179,14 @@ const server = http.createServer(async (req, res) => {
 
       const username = body.username.trim().toLowerCase();
       const [rows] = await pool.execute(
-        "SELECT id, username, password_hash FROM users WHERE username = ? LIMIT 1",
+        "SELECT id, username, password_hash, role FROM users WHERE username = ? LIMIT 1",
         [username]
       );
       if (rows.length === 0 || !(await verifyPassword(body.password, rows[0].password_hash))) {
         return sendJSON(res, 401, { error: "Username atau password salah." });
       }
 
-      const user = { id: rows[0].id, username: rows[0].username };
+      const user = { id: rows[0].id, username: rows[0].username, role: rows[0].role || "user" };
       const token = createAccessToken(user);
       return sendJSON(res, 200, {
         message: "Login berhasil.",

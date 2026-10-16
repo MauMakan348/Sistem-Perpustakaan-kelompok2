@@ -46,3 +46,14 @@ Jalankan `npm run migrate` di `loan-service`. Migration memeriksa apakah tabel `
 ## Browser
 
 Frontend mengirim JWT pada header `Authorization: Bearer ...` dan menyimpan token sementara di `sessionStorage` selama sesi tab. Token bukan database pengguna; secret JWT dan API Key tidak pernah disertakan dalam file frontend.
+
+
+## Role untuk penambahan buku
+
+Registrasi menghasilkan role `user` secara default dan endpoint registrasi tidak menerima parameter role. Operator yang berwenang dapat mengangkat akun menjadi admin melalui koneksi MySQL tepercaya ke `loan_db`:
+
+```sql
+UPDATE users SET role = 'admin' WHERE username = 'username_yang_dipilih';
+```
+
+Akun admin harus login kembali supaya JWT memuat claim role terbaru. `POST /api/books` mensyaratkan JWT valid dengan `role: admin`; token biasa menghasilkan `403`, sedangkan token hilang/tidak valid menghasilkan `401`. API Key saja tidak memberikan hak untuk menambah buku.

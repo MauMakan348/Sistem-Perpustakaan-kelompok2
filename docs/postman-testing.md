@@ -445,3 +445,12 @@ Semua request di atas menggunakan endpoint existing project melalui API Gateway.
 2. Jalankan `0A. Login Pengguna dan Simpan Token`. Expected `200 OK` dengan JWT. Collection test script menyimpan token pada variable `token`. Kredensial salah menghasilkan `401 Unauthorized`; input tidak lengkap menghasilkan `400 Bad Request`.
 3. Request `POST /api/loans` dan `GET /api/loans/:username` memerlukan header `Authorization: Bearer {{token}}`. Loan Service memverifikasi token dan tidak mempercayai username yang dikirim dalam body.
 4. API Key `X-API-Key` tetap tersedia untuk akses Gateway oleh client tepercaya; API Key tidak menggantikan JWT pada endpoint transaksi pengguna. Registrasi/login dibebaskan dari API Key agar frontend dapat memulai sesi tanpa menanam secret di browser.
+
+
+## Pengujian tambah buku
+
+1. Registrasikan akun lalu login sebagai user biasa untuk mendapatkan JWT.
+2. Untuk skenario sukses, ubah role satu akun menjadi admin melalui query operator di `docs/authentication.md`, lalu login ulang dan gunakan token baru.
+3. Kirim `POST {{baseUrl}}/api/books` dengan `Authorization: Bearer {{token}}` dan body `{ "title": "Buku Uji", "author": "Penulis Uji" }`. Harapan: `201`, `id` hasil MySQL, status `tersedia`.
+4. Uji judul kosong dan penulis kosong: `400`; token tidak ada atau invalid: `401`; token user biasa: `403`.
+5. Panggil `GET {{baseUrl}}/api/books` dengan token login untuk memastikan buku baru muncul. Verifikasi persistence dengan query `SELECT id, title, author, status FROM books WHERE title = 'Buku Uji';` pada database `book_db`.

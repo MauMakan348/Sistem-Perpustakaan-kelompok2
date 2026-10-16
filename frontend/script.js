@@ -3,6 +3,7 @@
 const API_GATEWAY = "http://localhost:4000";
 const TOKEN_STORAGE_KEY = "perpus_accessToken";
 const USER_STORAGE_KEY = "perpus_currentUser";
+const ROLE_STORAGE_KEY = "perpus_currentRole";
 const MAX_ACTIVE_LOANS = 3;
 
 function getCurrentUser() {
@@ -29,6 +30,7 @@ function setAuthMessage(message, isError = false) {
 function clearSession() {
   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
   sessionStorage.removeItem(USER_STORAGE_KEY);
+  sessionStorage.removeItem(ROLE_STORAGE_KEY);
 }
 
 function showLogin() {
@@ -83,6 +85,7 @@ document.getElementById("loginForm").addEventListener("submit", async event => {
 
     sessionStorage.setItem(TOKEN_STORAGE_KEY, data.token);
     sessionStorage.setItem(USER_STORAGE_KEY, data.user.username);
+    sessionStorage.setItem(ROLE_STORAGE_KEY, data.user.role || "user");
     document.getElementById("loginPassword").value = "";
     setAuthMessage("");
     await showApp();
@@ -99,7 +102,8 @@ document.getElementById("btnLogout").addEventListener("click", () => {
 async function showApp() {
   document.getElementById("loginScreen").classList.add("hidden");
   document.getElementById("appScreen").classList.remove("hidden");
-  document.getElementById("namaMahasiswa").textContent = `Halo, ${getCurrentUser()}`;
+  document.getElementById("namaMahasiswa").textContent = `Halo, ${getCurrentUser()} (${sessionStorage.getItem(ROLE_STORAGE_KEY) || "user"})`;
+  document.getElementById("adminBookPanel").classList.toggle("hidden", sessionStorage.getItem(ROLE_STORAGE_KEY) !== "admin");
   await renderBooks();
   await renderMyLoans();
 }
@@ -150,6 +154,40 @@ async function renderBooks() {
     body.appendChild(tr);
   });
 }
+
+// ================== TAMBAH BUKU (ADMIN) ==================
+document.getElementById("addBookForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (sessionStorage.getItem(ROLE_STORAGE_KEY) !== "admin") {
+    document.getElementById("addBookMessage").textContent = "Akses hanya untuk admin.";
+    return;
+  }
+  const title = document.getElementById("newBookTitle").value.trim();
+  const author = document.getElementById("newBookAuthor").value.trim();
+  const message = document.getElementById("addBookMessage");
+  if (!title || !author) {
+    message.textContent = "Judul dan penulis wajib diisi.";
+    return;
+  }
+  try {
+    const response = await apiFetch("/api/books", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, author }),
+    });
+    if (await handleExpiredSession(response)) return;
+    const data = await response.json();
+    if (!response.ok) {
+      message.textContent = data.error || "Buku gagal ditambahkan.";
+      return;
+    }
+    message.textContent = `Buku "${data.book.title}" berhasil ditambahkan.`;
+    document.getElementById("addBookForm").reset();
+    await renderBooks();
+  } catch {
+    message.textContent = "Tidak dapat menghubungi API Gateway.";
+  }
+});
 
 // ================== PINJAM BUKU ==================
 async function borrowBook(bookId) {

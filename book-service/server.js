@@ -54,6 +54,38 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, rows);
     }
 
+    // POST /books -> tambah buku baru; status dikelola server dan default tersedia.
+    if (req.method === "POST" && segments.length === 1 && segments[0] === "books") {
+      let body;
+      try {
+        body = await readBody(req);
+      } catch {
+        return sendJSON(res, 400, { error: "Body JSON tidak valid." });
+      }
+
+      if (typeof body.title !== "string" || !body.title.trim()) {
+        return sendJSON(res, 400, { error: "Judul buku wajib diisi." });
+      }
+      if (typeof body.author !== "string" || !body.author.trim()) {
+        return sendJSON(res, 400, { error: "Penulis buku wajib diisi." });
+      }
+      const title = body.title.trim();
+      const author = body.author.trim();
+      if (title.length > 500 || author.length > 255) {
+        return sendJSON(res, 400, { error: "Judul maksimal 500 karakter dan penulis maksimal 255 karakter." });
+      }
+
+      const [result] = await pool.execute(
+        "INSERT INTO books (title, author, status) VALUES (?, ?, 'tersedia')",
+        [title, author]
+      );
+      const [rows] = await pool.execute(
+        "SELECT id, title, author, status FROM books WHERE id = ?",
+        [result.insertId]
+      );
+      return sendJSON(res, 201, { message: "Buku berhasil ditambahkan.", book: rows[0] });
+    }
+
     // GET /books/:id -> detail satu buku
     if (req.method === "GET" && segments.length === 2 && segments[0] === "books") {
       const id = Number(segments[1]);

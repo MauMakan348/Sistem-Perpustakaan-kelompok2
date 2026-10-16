@@ -151,3 +151,12 @@ td button:disabled {
   min-height: 18px;
   font-size: 13px;
 }
+
+
+/* ---------- FORM TAMBAH BUKU ADMIN ---------- */
+.inline-form { display: grid; grid-template-columns: 90px minmax(180px, 1fr) 90px minmax(180px, 1fr) auto; gap: 10px; align-items: center; }
+.inline-form label { font-size: 13px; color: #374151; }
+.inline-form input { min-width: 0; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; }
+.inline-form button { background: #167647; color: white; border: 0; padding: 10px 14px; border-radius: 8px; cursor: pointer; }
+#addBookMessage { min-height: 18px; font-size: 13px; }
+@media (max-width: 800px) { .inline-form { grid-template-columns: 1fr; } }

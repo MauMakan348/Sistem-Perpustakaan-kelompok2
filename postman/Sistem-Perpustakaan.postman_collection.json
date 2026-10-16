@@ -37,6 +37,10 @@
     {
       "key": "token",
       "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
     }
   ],
   "item": [
@@ -163,6 +167,140 @@
         ],
         "url": "{{baseUrl}}/api/books/{{notFoundBookId}}",
         "description": "Ambil buku dengan ID yang tidak ada. Expected: 404 { error: \"Buku tidak ditemukan.\" }."
+      },
+      "response": []
+    },
+    {
+      "name": "2B. POST Books - Admin Berhasil Menambah Buku",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Buku Uji Tambah\",\n  \"author\": \"Penulis Uji\"\n}"
+        },
+        "url": "{{baseUrl}}/api/books",
+        "description": "Login dengan akun yang sudah dipromosikan role=admin. Expected: 201, ID dibuat MySQL, status otomatis tersedia. Client tidak dapat menentukan status."
+      },
+      "response": []
+    },
+    {
+      "name": "2C. POST Books - Judul Kosong",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"  \",\n  \"author\": \"Penulis Uji\"\n}"
+        },
+        "url": "{{baseUrl}}/api/books",
+        "description": "Expected: 400."
+      },
+      "response": []
+    },
+    {
+      "name": "2D. POST Books - Penulis Kosong",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Judul Uji\",\n  \"author\": \"  \"\n}"
+        },
+        "url": "{{baseUrl}}/api/books",
+        "description": "Expected: 400."
+      },
+      "response": []
+    },
+    {
+      "name": "2E. POST Books - Tanpa Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Buku Uji\",\n  \"author\": \"Penulis Uji\"\n}"
+        },
+        "url": "{{baseUrl}}/api/books",
+        "description": "Expected: 401."
+      },
+      "response": []
+    },
+    {
+      "name": "2F. POST Books - Token Tidak Valid",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer invalid.token.value"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Buku Uji\",\n  \"author\": \"Penulis Uji\"\n}"
+        },
+        "url": "{{baseUrl}}/api/books",
+        "description": "Expected: 401."
+      },
+      "response": []
+    },
+    {
+      "name": "2G. POST Books - User Biasa Ditolak",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Buku Uji\",\n  \"author\": \"Penulis Uji\"\n}"
+        },
+        "url": "{{baseUrl}}/api/books",
+        "description": "Isi collection variable userToken dengan JWT dari akun role=user. Expected: 403."
       },
       "response": []
     },

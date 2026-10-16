@@ -27,6 +27,10 @@ async function migrate() {
       if (missingColumns.length > 0) {
         throw new Error(`Tabel users sudah ada tetapi tidak kompatibel. Kolom yang belum ada: ${missingColumns.join(", ")}. Tidak ada tabel/data yang dihapus.`);
       }
+      // Role ditambahkan secara non-destruktif. Akun lama tetap user; admin ditetapkan manual oleh operator.
+      if (!existingColumnNames.has("role")) {
+        await pool.query("ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') NOT NULL DEFAULT 'user'");
+      }
       const [indexes] = await pool.query("SHOW INDEX FROM users");
       const uniqueIndexes = indexes.filter(index => Number(index.Non_unique) === 0);
       const hasUniqueUsername = uniqueIndexes.some(index => {

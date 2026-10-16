@@ -66,16 +66,19 @@ function getTarget(pathname, search) {
   return null;
 }
 
-function hasValidBearerToken(req) {
+function getBearerPayload(req) {
   const authorization = req.headers.authorization || "";
   const match = authorization.match(/^Bearer\s+(.+)$/i);
-  if (!match) return false;
+  if (!match) return null;
   try {
-    jwt.verify(match[1], JWT_SECRET, { issuer: "perpustakaan-loan-service" });
-    return true;
+    return jwt.verify(match[1], JWT_SECRET, { issuer: "perpustakaan-loan-service" });
   } catch {
-    return false;
+    return null;
   }
+}
+
+function hasValidBearerToken(req) {
+  return Boolean(getBearerPayload(req));
 }
 
 function isPublicAuthenticationRoute(req, pathname) {
@@ -144,9 +147,23 @@ const server = http.createServer((req, res) => {
   // Endpoint lain menerima API Key untuk client tepercaya atau JWT valid untuk pengguna login.
   const publicAuthRoute = isPublicAuthenticationRoute(req, url.pathname);
   const validApiKey = req.headers["x-api-key"] === API_KEY;
-  const validUserToken = hasValidBearerToken(req);
+  const tokenPayload = getBearerPayload(req);
+  const validUserToken = Boolean(tokenPayload);
+  // Hanya akun dengan role admin dapat menambah buku. API Key saja tidak cukup.
+  let validAdminBookCreate = false;
+  if (req.method === "POST" && url.pathname === "/api/books") {
+    if (!tokenPayload) {
+      sendJson(res, 401, { error: "Token autentikasi tidak ada, tidak valid, atau kedaluwarsa." });
+      return;
+    }
+    if (tokenPayload.role !== "admin") {
+      sendJson(res, 403, { error: "Hanya admin yang berwenang menambahkan buku." });
+      return;
+    }
+    validAdminBookCreate = true;
+  }
   const validUserAccess = isUserTokenRoute(req, url.pathname) && validUserToken;
-  if (!publicAuthRoute && !validApiKey && !validUserAccess) {
+  if (!publicAuthRoute && !validApiKey && !validUserAccess && !validAdminBookCreate) {
     sendJson(res, 401, { error: "API Key tidak valid atau token autentikasi tidak ditemukan/valid." });
     return;
   }

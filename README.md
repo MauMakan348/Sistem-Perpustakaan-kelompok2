@@ -572,3 +572,32 @@ Pembagian tugas individual yang lebih rinci tidak tercatat di source project yan
 - [Prompts](docs/prompts.md)
 - [E2E Loan Flow](docs/e2e-loan-flow.md)
 - [Postman Testing](docs/postman-testing.md)
+
+
+## Menambahkan Buku (Admin)
+
+`POST /api/books` hanya dapat dipanggil dengan JWT pengguna ber-role `admin`. Registrasi baru selalu membuat role `user`; akun tidak dapat memilih role saat registrasi. Untuk menetapkan admin, operator yang memiliki akses tepercaya ke MySQL `loan_db` menjalankan:
+
+```sql
+UPDATE users SET role = 'admin' WHERE username = 'username_yang_dipilih';
+```
+
+Pengguna tersebut harus login ulang agar JWT baru memuat role admin. Jangan memberi akses SQL tersebut kepada pengguna umum. Migrasi Loan Service menambahkan kolom role dengan default `user` untuk akun lama tanpa menghapus data. Buku disimpan oleh Book Service di MySQL `book_db`; status buku baru otomatis `tersedia`, dan ID dibuat oleh MySQL setelah menjalankan migrasi Book Service. Jalankan `npm run migrate` pada folder `book-service` dan `loan-service` sebelum menguji perubahan skema.
+
+Request:
+
+```http
+POST /api/books
+Authorization: Bearer <JWT_ADMIN>
+Content-Type: application/json
+
+{"title":"Algoritma Dasar", "author":"Budi Santoso"}
+```
+
+Respons sukses `201 Created`:
+
+```json
+{"message":"Buku berhasil ditambahkan.","book":{"id":9,"title":"Algoritma Dasar","author":"Budi Santoso","status":"tersedia"}}
+```
+
+`400` untuk judul/penulis kosong atau body tidak valid, `401` untuk token tidak ada/tidak valid, dan `403` untuk pengguna role `user`. Status tidak diterima dari client; server selalu menginisialisasi buku baru sebagai `tersedia`.
