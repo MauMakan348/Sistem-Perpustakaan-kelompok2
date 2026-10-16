@@ -1,262 +1,134 @@
-# Architecture — Sistem Peminjaman Buku Perpustakaan
+# Arsitektur Sistem Peminjaman Buku Perpustakaan
 
-## 1. Diagram Arsitektur
+## 1. Perubahan arsitektur
 
-```text
-                         CLIENT
-                  Web / Postman / Client
-                            |
-                     HTTP + X-API-Key
-                            |
-                            v
-                   +------------------+
-                   | API GATEWAY      |
-                   | localhost:4000   |
-                   +--------+---------+
-                            |
-                 +----------+----------+
-                 |                     |
-                 v                     v
-        +----------------+    +----------------+
-        | BOOK SERVICE   |    | LOAN SERVICE   |
-        | :4001          |    | :4002          |
-        +-------+--------+    +--------+-------+
-                |                       |
-                v                       v
-        +---------------+       +---------------+
-        | book_db       |       | loan_db       |
-        | MySQL         |       | MySQL         |
-        +---------------+       +---------------+
-                ^                       |
-                |                       |
-                +---- HTTP API <-------+
-                     Loan Service
-                     -> Book Service
-```
+### Sebelum pengembangan
 
-Client hanya menggunakan API Gateway `:4000`. Port `:4001` dan `:4002` digunakan oleh service internal.
-
-## 2. Komponen
-
-### Client
-
-Client dapat berupa frontend web atau tool API seperti Postman. Client mengirim request ke Gateway, bukan langsung ke Book Service atau Loan Service.
-
-Frontend yang ada pada project menggunakan:
+Project awal berupa frontend HTML/CSS/JavaScript dengan data berbasis file JSON atau penyimpanan lokal pada tahap awal. Pada tahap microservice awal, Book Service dan Loan Service telah dipisahkan tetapi client masih dapat mengakses service secara langsung.
 
 ```text
-http://localhost:4000
+Browser / Client
+   |             |
+   v             v
+Book Service   Loan Service
+   |             |
+ books data    loans data
 ```
 
-### API Gateway — `:4000`
-
-Gateway merupakan satu-satunya entry point API untuk client.
-
-Tanggung jawabnya:
-
-- meneruskan registrasi/login ke Loan Service tanpa meminta credential agar browser dapat memulai sesi;
-- menerima `X-API-Key` untuk client tepercaya seperti Postman;
-- memverifikasi JWT Bearer untuk route pengguna yang diizinkan;
-- menolak request lain tanpa API Key valid atau JWT yang diizinkan menggunakan HTTP `401`;
-- meneruskan header `Authorization` ke service tujuan;
-- menentukan service tujuan berdasarkan path;
-- meneruskan HTTP method;
-- meneruskan body;
-- meneruskan header yang relevan;
-- meneruskan response service ke client; dan
-- mengembalikan `502` ketika service internal tidak tersedia.
-
-Gateway tidak menjalankan aturan bisnis peminjaman atau pengelolaan data buku.
-
-### Book Service — `:4001`
-
-Book Service bertanggung jawab atas:
-
-- daftar buku;
-- detail buku;
-- status `tersedia` atau `dipinjam`; dan
-- Book MySQL (`book_db`).
-
-Endpoint internal yang digunakan:
+### Setelah pengembangan
 
 ```text
-GET   /books
-GET   /books/:id
-PATCH /books/:id/status
+                  Browser / Postman
+                         |
+                    HTTP :4000
+                         v
+                 +----------------+
+                 | API Gateway    |
+                 | auth + routing |
+                 +-------+--------+
+                         |
+               +---------+----------+
+               |                    |
+               v                    v
+       +---------------+    +----------------+
+       | Book Service  |    | Loan Service   |
+       | :4001         |    | :4002          |
+       +-------+-------+    +--------+-------+
+               |                     |
+               v                     v
+          MySQL book_db          MySQL loan_db
+               ^                     |
+               |                     |
+               +---- HTTP API --------+
+                    Loan -> Book
 ```
 
-### Loan Service — `:4002`
+Port `4000` adalah entry point client. Port `4001` dan `4002` digunakan oleh service. Gateway diimplementasikan dengan Node.js native `http`, bukan Express.
 
-Loan Service bertanggung jawab atas:
+## 2. Tanggung jawab komponen
 
-- registrasi pengguna dan login username/password;
-- hashing password menggunakan bcrypt;
-- penerbitan dan validasi JWT dengan masa berlaku;
-- transaksi peminjaman;
-- maksimal 3 peminjaman aktif per mahasiswa;
-- masa peminjaman 7 hari;
-- Loan MySQL (`loan_db`); dan
-- komunikasi dengan Book Service melalui HTTP API.
+### API Gateway (`api-gateway/server.js`, default port 4000)
 
-Endpoint internal:
+- Memetakan `/api/books...` ke Book Service dan `/api/loans...`, `/api/register`, `/api/login` ke Loan Service.
+- Memvalidasi API Key pada route yang membutuhkannya dan memverifikasi JWT untuk route pengguna.
+- Mensyaratkan role `admin` untuk `POST /api/books`.
+- Mengonsumsi `X-API-Key` di Gateway; header tersebut tidak diteruskan ke service internal.
+- Meneruskan method, path/query, body, `Content-Type`, `Accept`, `Authorization`, dan header relevan yang dipilih.
+- Mengembalikan error `502` saat upstream tidak tersedia dan `504` pada timeout.
+- Tidak menyimpan data atau menjalankan aturan bisnis peminjaman.
 
-```text
-POST /register
-POST /login
-GET  /loans/:username   (JWT wajib)
-POST /loans             (JWT wajib)
+### Book Service (`book-service/server.js`, default port 4001)
+
+Mengelola daftar buku, detail buku, penambahan buku, serta transisi status `tersedia`/`dipinjam`. Data disimpan di MySQL `book_db`, tabel `books`. Perubahan status menggunakan update bersyarat berdasarkan status yang diharapkan; jika status sudah berubah, service mengembalikan `409`.
+
+### Loan Service (`loan-service/server.js`, default port 4002)
+
+Mengelola registrasi/login, hashing password dengan `bcryptjs`, JWT, peminjaman, pengembalian, dan data riwayat transaksi. Data pengguna dan pinjaman disimpan di MySQL `loan_db`, tabel `users` dan `loans`. Loan Service meminta detail dan mengubah status buku melalui HTTP API Book Service; tidak menggunakan koneksi ke `book_db`.
+
+## 3. Database ownership dan migration
+
+| Service | Database | Tabel | Ownership |
+|---|---|---|---|
+| Book Service | `book_db` | `books` | Buku dan status buku |
+| Loan Service | `loan_db` | `users`, `loans` | Akun pengguna dan transaksi peminjaman |
+
+Setiap service menggunakan `mysql2` dan konfigurasi koneksi sendiri. File `books.json` dan `loans.json` tetap ada sebagai sumber data migration. Script `migrate.js` membuat/menyesuaikan skema dan mengimpor data lama bila tersedia; migration Loan Service menambahkan kolom status pengembalian untuk tabel lama tanpa menghapus baris yang sudah ada.
+
+## 4. Route publik Gateway
+
+| Method | Path Gateway | Tujuan internal |
+|---|---|---|
+| `POST` | `/api/register` | Loan Service `POST /register` |
+| `POST` | `/api/login` | Loan Service `POST /login` |
+| `GET` | `/api/books` | Book Service `GET /books` |
+| `GET` | `/api/books/:id` | Book Service `GET /books/:id` |
+| `POST` | `/api/books` | Book Service `POST /books` |
+| `PATCH` | `/api/books/:id/status` | Book Service `PATCH /books/:id/status` |
+| `POST` | `/api/loans` | Loan Service `POST /loans` |
+| `GET` | `/api/loans/:username` | Loan Service `GET /loans/:username` |
+| `POST` | `/api/loans/:id/return` | Loan Service `POST /loans/:id/return` |
+
+## 5. Aturan autentikasi
+
+- `POST /api/register` dan `POST /api/login` adalah route publik supaya pengguna dapat membuat akun dan memperoleh token.
+- GET buku menerima API Key valid atau JWT valid.
+- POST penambahan buku memerlukan JWT valid dengan `role: admin`; registrasi normal memberikan role `user`.
+- Route peminjaman, riwayat, dan pengembalian memerlukan JWT valid. API Key tidak menggantikan JWT pengguna.
+- PATCH status buku memerlukan API Key valid dan dimaksudkan untuk operasi tepercaya/backend.
+- `JWT_SECRET` minimal 32 byte dan nilainya harus sama di Gateway dan Loan Service. `API_KEY` disimpan di environment Gateway. Tidak satu pun secret dimasukkan ke frontend.
+
+Header client:
+
+```http
+X-API-Key: <API_KEY_LOKAL>
+Authorization: Bearer <JWT_HASIL_LOGIN>
+Content-Type: application/json
 ```
 
-Book Service dan Loan Service diikat ke loopback `127.0.0.1` pada konfigurasi lokal sehingga tidak listen pada interface jaringan eksternal. Client menggunakan Gateway `:4000`.
+## 6. Alur peminjaman end-to-end
 
-## 3. Public Routing pada Gateway
+1. Client mengirim `POST /api/loans` dengan `Authorization: Bearer <JWT>` dan body `{ "bookId": 2 }`.
+2. Gateway memvalidasi token dan meneruskan request ke Loan Service.
+3. Loan Service mengambil identitas username dari JWT, memeriksa batas maksimal 3 pinjaman aktif, lalu meminta detail buku lewat `GET /books/:id` ke Book Service.
+4. Jika buku tersedia, Loan Service meminta Book Service melakukan transisi atomik `tersedia` menjadi `dipinjam` lewat `PATCH /books/:id/status`. Hanya satu request yang dapat memenangkan transisi bersamaan.
+5. Loan Service memasukkan transaksi ke `loan_db` dengan status `active` dan tanggal jatuh tempo 7 hari setelah peminjaman.
+6. Jika insert gagal setelah reservasi buku, Loan Service mencoba mengembalikan status buku menjadi `tersedia`; kegagalan kompensasi dicatat untuk rekonsiliasi.
 
-| Public route | Internal target |
-|---|---|
-| `GET /api/books` | Book Service `GET /books` |
-| `GET /api/books/:id` | Book Service `GET /books/:id` |
-| `PATCH /api/books/:id/status` | Book Service `PATCH /books/:id/status` |
-| `POST /api/register` | Loan Service `POST /register` |
-| `POST /api/login` | Loan Service `POST /login` |
-| `GET /api/loans/:username` | Loan Service `GET /loans/:username` |
-| `POST /api/loans` | Loan Service `POST /loans` |
+## 7. Alur pengembalian
 
-## 4. Komunikasi Antar-Service
+1. Client mengirim `POST /api/loans/:id/return` menggunakan ID transaksi pinjaman, bukan ID buku, dengan JWT pemilik.
+2. Loan Service mengunci baris transaksi dengan `SELECT ... FOR UPDATE`, memeriksa kepemilikan dan status `active`.
+3. Loan Service memeriksa buku lewat Book Service, mengubah status buku menjadi `tersedia`, kemudian menyimpan `status='returned'` dan `returned_at` dalam transaksi MySQL.
+4. Transaksi yang sudah dikembalikan tidak dapat dikembalikan lagi (`409`). Jika update transaksi gagal setelah status buku berubah, Loan Service mencoba kompensasi mengubah status buku kembali menjadi `dipinjam`.
+5. `GET /api/loans/:username` menampilkan pinjaman aktif milik pengguna yang tokennya digunakan; transaksi yang dikembalikan tetap tersimpan di database tetapi tidak ditampilkan sebagai pinjaman aktif.
 
-Loan Service berkomunikasi dengan Book Service menggunakan HTTP API Node.js native.
+## 8. Environment dan teknologi
 
-Contoh saat peminjaman:
+- `api-gateway/.env`: `PORT`, `BOOK_SERVICE_HOST`, `BOOK_SERVICE_PORT`, `LOAN_SERVICE_HOST`, `LOAN_SERVICE_PORT`, `API_KEY`, `JWT_SECRET`.
+- `book-service/.env`: `PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
+- `loan-service/.env`: `PORT`, `BOOK_SERVICE_HOST`, `BOOK_SERVICE_PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_EXPIRES_IN`.
+- Stack: Node.js native HTTP, MySQL, `mysql2`, `dotenv`, `bcryptjs`, `jsonwebtoken`, HTML/CSS/Vanilla JS, Postman.
 
-```text
-Loan Service
-     |
-     | GET /books/2
-     v
-Book Service
-     |
-     | query MySQL
-     v
-Book Database
-```
+## 9. Batasan verifikasi
 
-Jika buku tersedia, Loan Service kemudian menyimpan transaksi pada database miliknya dan meminta Book Service mengubah status buku:
-
-```text
-Loan Service
-     |
-     | INSERT loan
-     v
-Loan Database
-
-Loan Service
-     |
-     | PATCH /books/2/status
-     v
-Book Service
-     |
-     | UPDATE books
-     v
-Book Database
-```
-
-Loan Service tidak membuka koneksi MySQL milik Book Service.
-
-## 5. Database Ownership
-
-Setiap service memiliki database sendiri.
-
-```text
-Book Service
-    |
-    +--> book_db
-          +--> books
-
-Loan Service
-    |
-    +--> loan_db
-          +--> loans
-```
-
-Ownership berarti service hanya mengelola data database miliknya.
-
-Loan Service membutuhkan informasi buku melalui API Book Service, bukan dengan menjalankan query terhadap `books` secara langsung.
-
-## 6. API Key Authentication
-
-Gateway menggunakan environment variable:
-
-```env
-API_KEY=your_api_key_here
-```
-
-Client mengirim:
-
-```text
-X-API-Key: <API_KEY>
-```
-
-Validasi dilakukan sebelum request diteruskan ke service tujuan. Jika header tidak ada atau nilainya salah, Gateway mengembalikan `401 Unauthorized`.
-
-API Key tidak ditanam di frontend public.
-
-## 7. Autentikasi Pengguna
-
-Tabel `users` dimiliki Loan Service di `loan_db` dan berisi `id`, `username` unik, `password_hash`, serta `created_at`. Migration memeriksa keberadaan tabel dan kolom yang dibutuhkan sebelum membuat tabel baru; migration tidak menghapus data pengguna yang ada.
-
-`POST /api/register` menerima username dan password, menyimpan password sebagai bcrypt hash, dan tidak mengembalikan hash. `POST /api/login` memverifikasi hash dan menerbitkan JWT dengan expiry. `JWT_SECRET` harus sama pada konfigurasi API Gateway dan Loan Service, tetapi tidak boleh berada di frontend.
-
-`X-API-Key` adalah credential client untuk Gateway. JWT adalah identitas pengguna. API Key tidak menggantikan JWT untuk endpoint transaksi; Loan Service memvalidasi token dan mengikat username pada path/body ke identitas token.
-
-## 8. End-to-End Flow: Peminjaman Buku
-
-```text
-Client
-  |
-  | POST /api/loans + X-API-Key
-  v
-API Gateway :4000
-  |
-  | POST /loans
-  v
-Loan Service :4002
-  |
-  | GET /books/:id
-  v
-Book Service :4001
-  |
-  | SELECT buku
-  v
-Book MySQL (`book_db`)
-  |
-  | data + status
-  v
-Loan Service
-  |
-  | INSERT transaksi
-  v
-Loan MySQL (`loan_db`)
-  |
-  | PATCH /books/:id/status
-  v
-Book Service :4001
-  |
-  | UPDATE status
-  v
-Book MySQL (`book_db`)
-  |
-  v
-Loan Service -> Gateway -> Client
-```
-
-Jika update status Book Service gagal setelah loan berhasil disimpan, Loan Service menjalankan rollback dengan menghapus loan yang baru dibuat.
-
-## 8. Error Handling Arsitektur
-
-- Gateway: `401` untuk API Key tidak valid/tidak ada.
-- Gateway: `404` untuk route Gateway yang tidak dikenal.
-- Gateway: `502` jika service internal tidak tersedia.
-- Loan Service: `400` untuk body/data peminjaman tidak valid.
-- Loan Service: `404` jika buku tidak ditemukan.
-- Loan Service: `409` jika buku sedang dipinjam atau batas 3 loan aktif tercapai.
-- Service: `500` untuk error database/request internal.
-- Loan Service melakukan rollback loan jika update status buku gagal.
+Source-level syntax check dan tes unit/static yang tersedia tidak membuktikan alur database end-to-end. Dalam hasil audit terakhir, tes source-level regresi dan tes keamanan Gateway lulus, sedangkan tes autentikasi Loan Service terhambat dependency `bcryptjs` yang tidak tersedia dan instalasi dependency timeout. Tes end-to-end dengan MySQL aktif belum dijalankan pada environment audit tersebut.

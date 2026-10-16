@@ -1,8 +1,8 @@
 # Prompt yang Digunakan Selama Pengembangan
 
-Dokumen ini mencatat prompt yang benar-benar digunakan dalam percakapan pengembangan project. Prompt ditulis kembali secara ringkas ketika diperlukan agar mudah dibaca, tanpa mengklaim langkah yang tidak dilakukan.
+Dokumen ini menyimpan prompt pengembangan yang tercatat dalam riwayat kerja project. Prompt pada tahap awal dipertahankan sebagai catatan historis; bila menyebut teknologi yang berbeda dari konfigurasi akhir, hal itu ditandai sebagai tahap sebelumnya, bukan instruksi konfigurasi project saat ini.
 
-## 1. Analisis dan Implementasi AC-02
+## 1. Analisis Acceptance Criteria AC-02
 
 ```text
 The implementation does not fully satisfy this Acceptance Criteria:
@@ -21,18 +21,13 @@ why it ignores active loan count, and what condition/location should be added.
 Do not change code yet.
 ```
 
-Tahap ini digunakan untuk menganalisis bug Acceptance Criteria sebelum perubahan kode dilakukan.
-
-## 2. Perencanaan Microservice
+## 2. Perencanaan pengembangan microservice
 
 ```text
-Kondisi proyek saya: teknologi sebelumnya html, jumlah anggota 4+, pilihan teknologi node.
-Bantu saya merencanakan pengembangan proyek perpustakaan menjadi microservice sesuai tugas.
+Kondisi proyek saya: teknologi sebelumnya html, jumlah anggota 4+, pilihan teknologi node. Bantu saya merencanakan pengembangan proyek perpustakaan menjadi microservice sesuai tugas.
 ```
 
-Requirement tugas kemudian dijabarkan menjadi Book Service, Loan Service, komunikasi API, API Gateway, database, dan alur end-to-end.
-
-## 3. Migrasi JSON ke PostgreSQL
+## 3. Migrasi JSON ke PostgreSQL — tahap historis
 
 ```text
 Sekarang implementasikan perubahan persistence dari JSON menjadi PostgreSQL.
@@ -58,7 +53,7 @@ Conditions:
 - No extra features.
 ```
 
-Prompt ini menghasilkan perubahan persistence ke PostgreSQL dan script migration.
+Prompt ini merupakan bagian riwayat perubahan sebelumnya. Database akhir yang digunakan project saat ini adalah MySQL, bukan PostgreSQL.
 
 ## 4. Implementasi API Gateway
 
@@ -88,7 +83,7 @@ Ketentuan:
 Sebelum implementasi jelaskan file dan alur routing, kemudian implementasikan.
 ```
 
-## 5. API Key Authentication
+## 5. API Key pada Gateway
 
 ```text
 Sekarang tambahkan API Key authentication pada API Gateway.
@@ -109,7 +104,9 @@ Ketentuan:
 - Jangan membuat authentication user yang kompleks.
 ```
 
-## 6. End-to-End Peminjaman
+Autentikasi pengguna kemudian berkembang untuk memakai JWT pada route peminjaman/pengembalian dan role admin pada penambahan buku.
+
+## 6. Alur peminjaman end-to-end
 
 ```text
 Sekarang pastikan terdapat minimal satu alur fitur end-to-end yang melibatkan lebih dari satu microservice.
@@ -139,7 +136,7 @@ Jangan membuat fitur tambahan yang tidak diperlukan.
 Setelah implementasi, buat contoh request dan response untuk setiap tahap penting.
 ```
 
-## 7. Skenario Testing Postman
+## 7. Skenario testing Postman
 
 ```text
 Sekarang buat skenario testing API menggunakan Postman.
@@ -168,7 +165,13 @@ Jangan membuat API baru hanya untuk testing.
 Gunakan endpoint yang benar-benar ada di project.
 ```
 
-## 8. Pembaruan Dokumentasi Akhir
+## 8. Migrasi PostgreSQL ke MySQL
+
+```text
+Saya ingin mengganti database project dari PostgreSQL menjadi MySQL. Jangan mengubah arsitektur microservice. Gunakan package mysql2 untuk Node.js. Book Service menggunakan database book_db dan Loan Service menggunakan database loan_db. Setiap service hanya mengakses database miliknya sendiri. Loan Service tidak boleh mengakses database Book Service secara langsung dan harus mengambil data buku melalui API Book Service. Gunakan environment variable, jangan hard-code password, buat .env.example, pastikan .env masuk .gitignore, sesuaikan migration dan query SQL, jangan mengubah endpoint, API Gateway, API Key, atau fitur yang sudah berjalan. Sebelum mengubah kode, cari seluruh penggunaan PostgreSQL/pg, identifikasi file, dependency, query yang tidak kompatibel, dan jelaskan rencana migrasi. Setelah perubahan, lakukan code review dan verifikasi koneksi, Gateway port 4000, komunikasi HTTP antar-service, GET books, POST loan, serta penyimpanan data MySQL. Laporkan semua perubahan dan keterbatasan pengujian.
+```
+
+## 9. Dokumentasi akhir project
 
 ```text
 Sekarang perbarui dokumentasi project berdasarkan implementasi yang benar-benar sudah selesai.
@@ -197,18 +200,19 @@ docs/prompts.md harus berisi prompt yang benar-benar digunakan.
 Jangan membuat klaim bahwa AI melakukan sesuatu yang sebenarnya tidak dilakukan.
 ```
 
-## Catatan Akurasi
+## 10. Perbaikan hasil audit
 
-Dokumentasi ini membedakan antara:
+```text
+Perbaiki masalah yang sudah ditemukan pada audit sebelumnya, tanpa mengubah bagian yang tidak terkait. Setelah perbaikan:
+1. Jalankan ulang tes yang gagal.
+2. Jalankan tes regresi untuk fitur yang sebelumnya berhasil.
+3. Tampilkan hanya file yang diubah atau ditambahkan.
+4. Jelaskan setiap perbaikan.
+5. Laporkan hasil tes yang benar-benar dijalankan.
+6. Jangan mengklaim semua tes lulus jika masih ada yang gagal.
+7. Jangan menyalin seluruh struktur project.
+```
 
-- requirement yang diminta;
-- kode yang benar-benar sudah dibuat;
-- testing yang benar-benar dilakukan; dan
-- hal yang belum dapat diuji karena environment membutuhkan PostgreSQL aktif/kredensial yang sesuai.
+## Catatan
 
-Tidak ada klaim bahwa fitur atau pengujian yang belum dilakukan sudah berhasil.
-
-
-## Prompt: Migrasi PostgreSQL ke MySQL
-
-> Saya ingin mengganti database project dari PostgreSQL menjadi MySQL. Jangan mengubah arsitektur microservice. Gunakan package mysql2 untuk Node.js. Book Service menggunakan database book_db dan Loan Service menggunakan database loan_db. Setiap service hanya mengakses database miliknya sendiri. Loan Service tidak boleh mengakses database Book Service secara langsung dan harus mengambil data buku melalui API Book Service. Gunakan environment variable, jangan hard-code password, buat .env.example, pastikan .env masuk .gitignore, sesuaikan migration dan query SQL, jangan mengubah endpoint, API Gateway, API Key, atau fitur yang sudah berjalan. Sebelum mengubah kode, cari seluruh penggunaan PostgreSQL/pg, identifikasi file, dependency, query yang tidak kompatibel, dan jelaskan rencana migrasi. Setelah perubahan, lakukan code review dan verifikasi koneksi, Gateway port 4000, komunikasi HTTP antar-service, GET books, POST loan, serta penyimpanan data MySQL. Laporkan semua perubahan dan keterbatasan pengujian.
+Daftar ini hanya mencakup prompt yang tercatat pada riwayat pengembangan yang tersedia. Tidak ditambahkan klaim tentang prompt lain yang tidak terdokumentasi. Untuk hasil audit dan batasan pengujian, lihat `docs/ai-usage.md`.
