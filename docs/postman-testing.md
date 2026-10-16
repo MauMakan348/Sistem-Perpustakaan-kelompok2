@@ -437,3 +437,11 @@ Untuk menjaga data tidak berubah tanpa sengaja:
 6. Kasus service/database mati dilakukan terpisah dari testing normal.
 
 Semua request di atas menggunakan endpoint existing project melalui API Gateway. Tidak ada endpoint baru yang dibuat khusus untuk testing.
+
+
+## Registrasi dan login pengguna
+
+1. Jalankan `0. Registrasi Pengguna` dengan username baru dan password minimal 8 karakter. Expected `201 Created`; username duplikat `409 Conflict`; input tidak valid `400 Bad Request`.
+2. Jalankan `0A. Login Pengguna dan Simpan Token`. Expected `200 OK` dengan JWT. Collection test script menyimpan token pada variable `token`. Kredensial salah menghasilkan `401 Unauthorized`; input tidak lengkap menghasilkan `400 Bad Request`.
+3. Request `POST /api/loans` dan `GET /api/loans/:username` memerlukan header `Authorization: Bearer {{token}}`. Loan Service memverifikasi token dan tidak mempercayai username yang dikirim dalam body.
+4. API Key `X-API-Key` tetap tersedia untuk akses Gateway oleh client tepercaya; API Key tidak menggantikan JWT pada endpoint transaksi pengguna. Registrasi/login dibebaskan dari API Key agar frontend dapat memulai sesi tanpa menanam secret di browser.

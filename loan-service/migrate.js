@@ -8,7 +8,39 @@ async function migrate() {
   const loans = JSON.parse(fs.readFileSync(loansFile, "utf8"));
 
   await checkDatabaseConnection();
-  await pool.query(fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8"));
+
+  const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
+  const statements = schema.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
+  const [userTableRows] = await pool.query(
+    `SELECT COUNT(*) AS tableCount
+     FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'users'`
+  );
+  const usersTableExists = Number(userTableRows[0].tableCount) > 0;
+
+  for (const statement of statements) {
+    if (usersTableExists && /^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+users\b/i.test(statement)) {
+      const [columns] = await pool.query("SHOW COLUMNS FROM users");
+      const existingColumnNames = new Set(columns.map(column => column.Field));
+      const requiredColumns = ["id", "username", "password_hash", "created_at"];
+      const missingColumns = requiredColumns.filter(column => !existingColumnNames.has(column));
+      if (missingColumns.length > 0) {
+        throw new Error(`Tabel users sudah ada tetapi tidak kompatibel. Kolom yang belum ada: ${missingColumns.join(", ")}. Tidak ada tabel/data yang dihapus.`);
+      }
+      const [indexes] = await pool.query("SHOW INDEX FROM users");
+      const uniqueIndexes = indexes.filter(index => Number(index.Non_unique) === 0);
+      const hasUniqueUsername = uniqueIndexes.some(index => {
+        const columnsInIndex = uniqueIndexes.filter(candidate => candidate.Key_name === index.Key_name);
+        return index.Column_name === "username" && Number(index.Seq_in_index) === 1 && columnsInIndex.length === 1;
+      });
+      if (!hasUniqueUsername) {
+        throw new Error("Tabel users sudah ada tetapi username belum memiliki unique index. Tambahkan constraint unik secara terencana; migration tidak mengubah tabel yang sudah ada.");
+      }
+      console.log("[Loan Service] tabel users sudah ada dan kompatibel; tidak dibuat ulang.");
+      continue;
+    }
+    await pool.query(statement);
+  }
 
   for (const loan of loans) {
     await pool.query(

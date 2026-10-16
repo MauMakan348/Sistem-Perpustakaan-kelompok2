@@ -1,157 +1,208 @@
-// =========================================================
-// FRONTEND
-// Tidak lagi menyimpan data sendiri (tidak ada localStorage
-// untuk data buku/peminjaman) — semua data diambil dari
-// Book Service dan Loan Service lewat fetch().
-// Hanya nama user yang disimpan di localStorage sekadar
-// supaya sesi login tidak hilang saat refresh halaman.
-// =========================================================
-
+// Frontend memakai API Gateway. API Key/JWT signing secret tidak disimpan di browser.
+// JWT access token hanya disimpan di sessionStorage selama tab sesi ini.
 const API_GATEWAY = "http://localhost:4000";
-const API_KEY = "perpus-kel2";
-
-function apiFetch(path, options = {}) {
-  const headers = {
-    ...(options.headers || {}),
-    "X-API-Key": API_KEY,
-  };
-
-  return fetch(`${API_GATEWAY}${path}`, {
-    ...options,
-    headers,
-  });
-}
+const TOKEN_STORAGE_KEY = "perpus_accessToken";
+const USER_STORAGE_KEY = "perpus_currentUser";
 const MAX_ACTIVE_LOANS = 3;
 
 function getCurrentUser() {
-  return localStorage.getItem("perpus_currentUser");
+  return sessionStorage.getItem(USER_STORAGE_KEY);
 }
 
-// ================== LOGIN ==================
-document.getElementById("btnLogin").addEventListener("click", async () => {
-  const nama = document.getElementById("namaInput").value.trim();
-  if (!nama) {
-    alert("Nama tidak boleh kosong.");
-    return;
-  }
+function getAccessToken() {
+  return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+function apiFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  const token = getAccessToken();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(`${API_GATEWAY}${path}`, { ...options, headers });
+}
+
+function setAuthMessage(message, isError = false) {
+  const element = document.getElementById("authMessage");
+  element.textContent = message;
+  element.style.color = isError ? "#b42318" : "#167647";
+}
+
+function clearSession() {
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(USER_STORAGE_KEY);
+}
+
+function showLogin() {
+  document.getElementById("appScreen").classList.add("hidden");
+  document.getElementById("loginScreen").classList.remove("hidden");
+}
+
+// ================== REGISTRASI ==================
+document.getElementById("registerForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const username = document.getElementById("registerUsername").value.trim();
+  const password = document.getElementById("registerPassword").value;
 
   try {
-    const res = await apiFetch(`/api/login`, {
+    const response = await fetch(`${API_GATEWAY}/api/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: nama }),
+      body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.error || "Login gagal.");
+    const data = await response.json();
+    if (!response.ok) {
+      setAuthMessage(data.error || "Registrasi gagal.", true);
       return;
     }
 
-    localStorage.setItem("perpus_currentUser", data.username);
-    showApp();
-  } catch (err) {
-    alert("Tidak dapat menghubungi API Gateway. Pastikan Gateway dan service sudah berjalan.");
+    document.getElementById("loginUsername").value = data.user.username;
+    document.getElementById("loginPassword").value = "";
+    document.getElementById("registerPassword").value = "";
+    setAuthMessage("Registrasi berhasil. Silakan login dengan akun baru.");
+  } catch {
+    setAuthMessage("Tidak dapat menghubungi API Gateway. Periksa apakah Gateway dan Loan Service berjalan.", true);
+  }
+});
+
+// ================== LOGIN ==================
+document.getElementById("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const username = document.getElementById("loginUsername").value.trim();
+  const password = document.getElementById("loginPassword").value;
+
+  try {
+    const response = await fetch(`${API_GATEWAY}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      setAuthMessage(data.error || "Login gagal.", true);
+      return;
+    }
+
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+    sessionStorage.setItem(USER_STORAGE_KEY, data.user.username);
+    document.getElementById("loginPassword").value = "";
+    setAuthMessage("");
+    await showApp();
+  } catch {
+    setAuthMessage("Tidak dapat menghubungi API Gateway. Pastikan Gateway dan service sudah berjalan.", true);
   }
 });
 
 document.getElementById("btnLogout").addEventListener("click", () => {
-  localStorage.removeItem("perpus_currentUser");
-  document.getElementById("appScreen").classList.add("hidden");
-  document.getElementById("loginScreen").classList.remove("hidden");
+  clearSession();
+  showLogin();
 });
 
 async function showApp() {
   document.getElementById("loginScreen").classList.add("hidden");
   document.getElementById("appScreen").classList.remove("hidden");
-  document.getElementById("namaMahasiswa").innerText = "Halo, " + getCurrentUser();
+  document.getElementById("namaMahasiswa").textContent = `Halo, ${getCurrentUser()}`;
   await renderBooks();
   await renderMyLoans();
 }
 
+async function handleExpiredSession(response) {
+  if (response.status === 401) {
+    clearSession();
+    showLogin();
+    setAuthMessage("Sesi login berakhir. Silakan login kembali.", true);
+    return true;
+  }
+  return false;
+}
+
 // ================== DAFTAR BUKU ==================
 async function renderBooks() {
-  const user = getCurrentUser();
-
-  const [books, myLoans] = await Promise.all([
-    apiFetch(`/api/books`).then(r => r.json()),
-    apiFetch(`/api/loans/${encodeURIComponent(user)}`).then(r => r.json()),
+  const [booksResponse, loansResponse] = await Promise.all([
+    apiFetch("/api/books"),
+    apiFetch(`/api/loans/${encodeURIComponent(getCurrentUser())}`),
   ]);
+  if (await handleExpiredSession(booksResponse) || await handleExpiredSession(loansResponse)) return;
+  if (!booksResponse.ok || !loansResponse.ok) throw new Error("Gagal memuat data perpustakaan.");
 
+  const books = await booksResponse.json();
+  const myLoans = await loansResponse.json();
   const limitReached = myLoans.length >= MAX_ACTIVE_LOANS;
-
   const body = document.getElementById("bodyBuku");
-  body.innerHTML = "";
+  body.replaceChildren();
 
   books.forEach(book => {
     const tr = document.createElement("tr");
-
-    const statusLabel = book.status === "tersedia"
-      ? '<span class="status-tersedia">Tersedia</span>'
-      : '<span class="status-dipinjam">Dipinjam</span>';
-
-    const disabled = (book.status !== "tersedia" || limitReached) ? "disabled" : "";
-    const label = book.status !== "tersedia"
-      ? "Tidak Tersedia"
-      : (limitReached ? "Batas Maksimal" : "Pinjam");
-
-    tr.innerHTML = `
-      <td>${book.title}</td>
-      <td>${book.author}</td>
-      <td>${statusLabel}</td>
-      <td><button ${disabled} onclick="borrowBook(${book.id})">${label}</button></td>
-    `;
+    const titleCell = document.createElement("td");
+    titleCell.textContent = book.title;
+    const authorCell = document.createElement("td");
+    authorCell.textContent = book.author;
+    const statusCell = document.createElement("td");
+    const statusLabel = document.createElement("span");
+    statusLabel.className = book.status === "tersedia" ? "status-tersedia" : "status-dipinjam";
+    statusLabel.textContent = book.status === "tersedia" ? "Tersedia" : "Dipinjam";
+    statusCell.appendChild(statusLabel);
+    const actionCell = document.createElement("td");
+    const button = document.createElement("button");
+    button.disabled = book.status !== "tersedia" || limitReached;
+    button.textContent = book.status !== "tersedia" ? "Tidak Tersedia" : (limitReached ? "Batas Maksimal" : "Pinjam");
+    button.addEventListener("click", () => borrowBook(book.id));
+    actionCell.appendChild(button);
+    tr.append(titleCell, authorCell, statusCell, actionCell);
     body.appendChild(tr);
   });
 }
 
 // ================== PINJAM BUKU ==================
 async function borrowBook(bookId) {
-  const user = getCurrentUser();
-
   try {
-    const res = await apiFetch(`/api/loans`, {
+    const response = await apiFetch("/api/loans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: user, bookId }),
+      body: JSON.stringify({ bookId }),
     });
-    const data = await res.json();
-
-    if (!res.ok) {
+    if (await handleExpiredSession(response)) return;
+    const data = await response.json();
+    if (!response.ok) {
       alert(data.error || "Peminjaman gagal.");
-      await renderBooks(); // sinkronkan ulang tampilan
+      await renderBooks();
       return;
     }
 
     alert(`Buku "${data.loan.bookTitle}" berhasil dipinjam.`);
     await renderBooks();
     await renderMyLoans();
-  } catch (err) {
-    alert("Tidak dapat menghubungi API Gateway. Pastikan Gateway dan service sudah berjalan.");
+  } catch {
+    alert("Tidak dapat memuat data dari API Gateway. Pastikan semua service berjalan.");
   }
 }
 
 // ================== BUKU SAYA ==================
 async function renderMyLoans() {
-  const user = getCurrentUser();
-  const myLoans = await apiFetch(`/api/loans/${encodeURIComponent(user)}`).then(r => r.json());
-
-  document.getElementById("jumlahPinjam").innerText = myLoans.length;
-
+  const response = await apiFetch(`/api/loans/${encodeURIComponent(getCurrentUser())}`);
+  if (await handleExpiredSession(response)) return;
+  if (!response.ok) throw new Error("Gagal memuat peminjaman pengguna.");
+  const myLoans = await response.json();
+  document.getElementById("jumlahPinjam").textContent = myLoans.length;
   const body = document.getElementById("bodyPinjaman");
-  body.innerHTML = "";
+  body.replaceChildren();
+
   myLoans.forEach(loan => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${loan.bookTitle}</td>
-      <td>${new Date(loan.borrowDate).toLocaleDateString("id-ID")}</td>
-      <td>${new Date(loan.dueDate).toLocaleDateString("id-ID")}</td>
-    `;
+    const title = document.createElement("td");
+    title.textContent = loan.bookTitle;
+    const borrowed = document.createElement("td");
+    borrowed.textContent = new Date(loan.borrowDate).toLocaleDateString("id-ID");
+    const due = document.createElement("td");
+    due.textContent = new Date(loan.dueDate).toLocaleDateString("id-ID");
+    tr.append(title, borrowed, due);
     body.appendChild(tr);
   });
 }
 
 // ================== INIT ==================
-if (getCurrentUser()) {
-  showApp();
+if (getAccessToken() && getCurrentUser()) {
+  showApp().catch(() => {
+    clearSession();
+    showLogin();
+    setAuthMessage("Sesi tidak dapat dipulihkan. Silakan login kembali.", true);
+  });
 }

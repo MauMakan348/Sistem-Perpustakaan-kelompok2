@@ -2,23 +2,110 @@
   "info": {
     "_postman_id": "7d8b2d10-9c3a-4f36-9f1b-5e2c1d7a9012",
     "name": "Sistem Perpustakaan - API Gateway",
-    "description": "Skenario pengujian API melalui API Gateway. Tidak ada API testing khusus yang ditambahkan; semua request menggunakan endpoint existing project.",
+    "description": "Skenario pengujian API melalui API Gateway. Registrasi/login dapat diakses tanpa API Key agar frontend dapat memulai sesi. Request lain menggunakan API Key untuk client tepercaya atau JWT Bearer untuk pengguna login. Login menyimpan JWT ke collection variable token.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {"key": "baseUrl", "value": "http://localhost:4000"},
-    {"key": "apiKey", "value": "your_api_key_here"},
-    {"key": "username", "value": "kokop"},
-    {"key": "availableBookId", "value": "2"},
-    {"key": "borrowedBookId", "value": "1"},
-    {"key": "notFoundBookId", "value": "999999"}
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "apiKey",
+      "value": "your_api_key_here"
+    },
+    {
+      "key": "username",
+      "value": "kokop"
+    },
+    {
+      "key": "availableBookId",
+      "value": "2"
+    },
+    {
+      "key": "borrowedBookId",
+      "value": "1"
+    },
+    {
+      "key": "notFoundBookId",
+      "value": "999999"
+    },
+    {
+      "key": "password",
+      "value": "TestPassword123!"
+    },
+    {
+      "key": "token",
+      "value": ""
+    }
   ],
   "item": [
+    {
+      "name": "0. Registrasi Pengguna",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"}"
+        },
+        "url": "{{baseUrl}}/api/register",
+        "description": "Membuat akun baru. Endpoint registrasi tidak memerlukan API Key agar frontend dapat memulai registrasi. Expected: 201; username duplikat: 409; input invalid: 400."
+      },
+      "response": []
+    },
+    {
+      "name": "0A. Login Pengguna dan Simpan Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  if (body.token) pm.collectionVariables.set(\"token\", body.token);",
+              "  if (body.user && body.user.username) pm.collectionVariables.set(\"username\", body.user.username);",
+              "}",
+              "pm.test(\"Login berhasil atau menampilkan error yang diharapkan\", function () {",
+              "  pm.expect([200, 400, 401]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"}"
+        },
+        "url": "{{baseUrl}}/api/login",
+        "description": "Login pengguna. Jika berhasil, test script menyimpan JWT pada collection variable token. Expected: 200; password salah: 401; input tidak lengkap: 400."
+      },
+      "response": []
+    },
     {
       "name": "1. GET Books - API Key Benar",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "{{apiKey}}"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": "{{baseUrl}}/api/books",
         "description": "Daftar semua buku melalui API Gateway. Expected: 200 jika Book Service dan database tersedia."
       },
@@ -28,7 +115,12 @@
       "name": "1A. GET Books - API Key Salah",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "wrong-api-key"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "wrong-api-key"
+          }
+        ],
         "url": "{{baseUrl}}/api/books",
         "description": "Pengujian API Key salah. Expected: 401 dan request tidak diteruskan ke Book Service."
       },
@@ -48,7 +140,12 @@
       "name": "2. GET Book by ID - Ditemukan",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "{{apiKey}}"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": "{{baseUrl}}/api/books/{{availableBookId}}",
         "description": "Ambil detail buku yang ada. Default availableBookId=2. Expected: 200."
       },
@@ -58,7 +155,12 @@
       "name": "2A. GET Book by ID - Tidak Ditemukan",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "{{apiKey}}"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": "{{baseUrl}}/api/books/{{notFoundBookId}}",
         "description": "Ambil buku dengan ID yang tidak ada. Expected: 404 { error: \"Buku tidak ditemukan.\" }."
       },
@@ -69,12 +171,25 @@
       "request": {
         "method": "POST",
         "header": [
-          {"key": "X-API-Key", "value": "{{apiKey}}"},
-          {"key": "Content-Type", "value": "application/json"}
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{availableBookId}}\n}"},
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": {{availableBookId}}\n}"
+        },
         "url": "{{baseUrl}}/api/loans",
-        "description": "Alur E2E peminjaman: Gateway -> Loan Service -> Book Service -> Book DB, kemudian Loan DB dan update status buku. Default bookId=2. Expected: 201 jika buku tersedia."
+        "description": "Alur E2E peminjaman: Gateway -> Loan Service -> Book Service -> Book DB, kemudian Loan DB dan update status buku. Default bookId=2. Expected: 201 jika buku tersedia. Login dahulu dan gunakan JWT Bearer token; username diambil dari token."
       },
       "response": []
     },
@@ -83,10 +198,19 @@
       "request": {
         "method": "POST",
         "header": [
-          {"key": "X-API-Key", "value": "wrong-api-key"},
-          {"key": "Content-Type", "value": "application/json"}
+          {
+            "key": "X-API-Key",
+            "value": "wrong-api-key"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
-        "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{availableBookId}}\n}"},
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{availableBookId}}\n}"
+        },
         "url": "{{baseUrl}}/api/loans",
         "description": "Expected: 401."
       },
@@ -96,8 +220,16 @@
       "name": "3B. POST Loan - API Key Tidak Dikirim",
       "request": {
         "method": "POST",
-        "header": [{"key": "Content-Type", "value": "application/json"}],
-        "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{availableBookId}}\n}"},
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{availableBookId}}\n}"
+        },
         "url": "{{baseUrl}}/api/loans",
         "description": "Expected: 401."
       },
@@ -108,12 +240,25 @@
       "request": {
         "method": "POST",
         "header": [
-          {"key": "X-API-Key", "value": "{{apiKey}}"},
-          {"key": "Content-Type", "value": "application/json"}
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{username}}\"\n}"},
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
         "url": "{{baseUrl}}/api/loans",
-        "description": "Missing bookId. Expected: 400 { error: \"username dan bookId wajib diisi.\" }."
+        "description": "Body tidak berisi bookId. Expected: 400 setelah token valid."
       },
       "response": []
     },
@@ -122,10 +267,23 @@
       "request": {
         "method": "POST",
         "header": [
-          {"key": "X-API-Key", "value": "{{apiKey}}"},
-          {"key": "Content-Type", "value": "application/json"}
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{borrowedBookId}}\n}"},
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": {{borrowedBookId}}\n}"
+        },
         "url": "{{baseUrl}}/api/loans",
         "description": "Default borrowedBookId=1 berdasarkan data awal. Expected: 409 jika status buku dipinjam."
       },
@@ -136,10 +294,23 @@
       "request": {
         "method": "POST",
         "header": [
-          {"key": "X-API-Key", "value": "{{apiKey}}"},
-          {"key": "Content-Type", "value": "application/json"}
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
         ],
-        "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{notFoundBookId}}\n}"},
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": {{notFoundBookId}}\n}"
+        },
         "url": "{{baseUrl}}/api/loans",
         "description": "Expected: 404 jika ID buku tidak ada."
       },
@@ -149,7 +320,16 @@
       "name": "4. GET Loans by Username",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "{{apiKey}}"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
         "url": "{{baseUrl}}/api/loans/{{username}}",
         "description": "Daftar peminjaman aktif mahasiswa. Expected: 200 dan array."
       },
@@ -159,9 +339,14 @@
       "name": "4A. GET Loans - API Key Salah",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "wrong-api-key"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "wrong-api-key"
+          }
+        ],
         "url": "{{baseUrl}}/api/loans/{{username}}",
-        "description": "Expected: 401."
+        "description": "Pengujian API Key salah tanpa JWT. Expected: 401 dari Gateway."
       },
       "response": []
     },
@@ -169,7 +354,12 @@
       "name": "5. Simulasi Book Service Mati - GET Books",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "{{apiKey}}"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          }
+        ],
         "url": "{{baseUrl}}/api/books",
         "description": "Hentikan Book Service :4001 setelah Gateway berjalan. Expected: 502 dari Gateway. Jangan jalankan bersamaan dengan request normal."
       },
@@ -179,7 +369,16 @@
       "name": "6. Simulasi Loan Service Mati - GET Loans",
       "request": {
         "method": "GET",
-        "header": [{"key": "X-API-Key", "value": "{{apiKey}}"}],
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
         "url": "{{baseUrl}}/api/loans/{{username}}",
         "description": "Hentikan Loan Service :4002 setelah Gateway berjalan. Expected: 502 dari Gateway. Jangan jalankan bersamaan dengan request normal."
       },
