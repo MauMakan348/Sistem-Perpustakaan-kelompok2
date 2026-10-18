@@ -1,225 +1,100 @@
-# End-to-End Flow: Peminjaman Buku
+# Alur End-to-End: Peminjaman Buku
 
-Alur ini adalah contoh fitur lengkap yang melibatkan lebih dari satu microservice.
+Dokumen ini menjelaskan alur sesuai implementasi saat ini. Client mengakses API Gateway. Loan Service tidak mengakses database Book Service secara langsung.
 
 ```text
 Client / Postman
-      |
-      | POST /api/loans + X-API-Key
-      v
+  | POST /api/loans + Authorization: Bearer <JWT> + { bookId }
+  v
 API Gateway :4000
-      |
-      | POST /loans
-      v
+  | POST /loans (HTTP)
+  v
 Loan Service :4002
-      |
-      | GET /books/:id
-      v
-Book Service :4001
-      |
-      | SELECT ... FROM books
-      v
-Book MySQL (`book_db`)
-      |
-      | data buku + status
-      v
-Book Service
-      |
-      | response buku
-      v
-Loan Service
-      |
-      | INSERT INTO loans
-      v
-Loan MySQL (`loan_db`)
-      |
-      | PATCH /books/:id/status
-      v
-Book Service :4001
-      |
-      | UPDATE books SET status = 'dipinjam'
-      v
-Book MySQL (`book_db`)
-      |
-      | response berhasil
-      v
-Loan Service
-      |
-      v
-API Gateway
-      |
-      v
-Client / Postman
+  | GET /books/:id (HTTP)
+  v
+Book Service :4001 -> MySQL book_db
+  |
+  | PATCH /books/:id/status { status: "dipinjam" }
+  v
+Book Service :4001 -> conditional UPDATE books
+  |
+  | reservation berhasil
+  v
+Loan Service :4002 -> INSERT loans pada MySQL loan_db
+  |
+  | jika insert gagal, kompensasi status buku menjadi tersedia
+  v
+API Gateway -> Client
 ```
 
-## 1. Client -> API Gateway
-
-Request:
+## 1. Client ke Gateway
 
 ```http
 POST http://localhost:4000/api/loans
-X-API-Key: <API_KEY>
+Authorization: Bearer <JWT_HASIL_LOGIN>
 Content-Type: application/json
 ```
 
-Body:
-
 ```json
-{
-  "username": "kokop",
-  "bookId": 2
-}
+{ "bookId": 2 }
 ```
 
-Gateway memeriksa `X-API-Key`. Jika valid, request diteruskan ke Loan Service. Gateway tidak menjalankan aturan peminjaman.
+Username diperoleh dari JWT. Body tidak perlu memuat username. API Key tidak menggantikan JWT untuk operasi peminjaman.
 
-## 2. API Gateway -> Loan Service
+## 2. Validasi Loan Service
 
-Request internal:
+Loan Service memastikan token valid, `bookId` merupakan integer positif, pengguna belum mencapai batas 3 pinjaman aktif, dan buku dapat ditemukan melalui `GET /books/:id` pada Book Service.
 
-```http
-POST http://localhost:4002/loans
-Content-Type: application/json
-```
+## 3. Reservasi buku atomik
 
-Body tetap:
+Loan Service meminta Book Service melakukan `PATCH /books/:id/status` dengan body `{ "status": "dipinjam" }`. Book Service hanya mengubah status jika status saat ini `tersedia`. Bila dua request bersamaan berebut buku yang sama, satu transisi berhasil dan request lain menerima `409`.
 
-```json
-{
-  "username": "kokop",
-  "bookId": 2
-}
-```
+## 4. Simpan transaksi
 
-## 3. Loan Service validasi request
+Setelah reservasi berhasil, Loan Service menyimpan transaksi di `loan_db.loans` dengan `status='active'`, tanggal pinjam, dan tanggal jatuh tempo 7 hari kemudian. Response `201` berisi objek `loan`, termasuk ID transaksi yang digunakan kelak saat pengembalian.
 
-Loan Service memeriksa:
+Jika penyimpanan transaksi gagal, Loan Service mencoba kompensasi mengubah status buku kembali menjadi `tersedia`. Jika kompensasi juga gagal, log memberi peringatan untuk rekonsiliasi manual; ini bukan transaksi atomik lintas dua database.
 
-- `username` tersedia.
-- `bookId` tersedia dan berupa integer.
-- jumlah peminjaman aktif mahasiswa belum mencapai 3.
-
-Jika data tidak lengkap:
-
-```http
-400 Bad Request
-```
-
-```json
-{
-  "error": "username dan bookId wajib diisi."
-}
-```
-
-## 4. Loan Service -> Book Service
-
-Loan Service tidak membaca database Book Service. Loan Service meminta data buku melalui HTTP API:
-
-```http
-GET http://localhost:4001/books/2
-```
-
-Book Service kemudian mengambil data dari database miliknya:
-
-```sql
-SELECT id, title, author, status
-FROM books
-WHERE id = 2;
-```
-
-Contoh response:
-
-```json
-{
-  "id": 2,
-  "title": "Bumbu Kacang Asli dari Kebumen",
-  "author": "Mas Narji",
-  "status": "tersedia"
-}
-```
-
-## 5. Loan Service membuat transaksi
-
-Karena buku tersedia, Loan Service membuat transaksi pada **Loan Database**:
-
-```sql
-INSERT INTO loans
-  (id, username, book_id, book_title, borrow_date, due_date)
-VALUES (...);
-```
-
-Masa peminjaman tetap 7 hari sesuai business rule yang sudah ada.
-
-## 6. Loan Service -> Book Service untuk mengubah status
-
-Setelah transaksi loan dibuat, Loan Service meminta Book Service mengubah status buku:
-
-```http
-PATCH http://localhost:4001/books/2/status
-Content-Type: application/json
-```
-
-Body:
-
-```json
-{
-  "status": "dipinjam"
-}
-```
-
-Book Service menjalankan update pada Book Database:
-
-```sql
-UPDATE books
-SET status = 'dipinjam'
-WHERE id = 2;
-```
-
-## 7. Response kembali ke Client
-
-Book Service mengembalikan hasil update ke Loan Service. Loan Service kemudian mengembalikan:
-
-```http
-201 Created
-```
+## 5. Contoh response sukses
 
 ```json
 {
   "message": "Buku berhasil dipinjam.",
   "loan": {
     "id": 1790211757128,
-    "username": "kokop",
+    "username": "mahasiswa01",
     "bookId": 2,
-    "bookTitle": "Bumbu Kacang Asli dari Kebumen",
-    "borrowDate": "2026-10-01T06:30:00.000Z",
-    "dueDate": "2026-10-08T06:30:00.000Z"
+    "bookTitle": "Contoh Judul",
+    "borrowDate": "2026-10-17T01:00:00.000Z",
+    "dueDate": "2026-10-24T01:00:00.000Z",
+    "status": "active"
   }
 }
 ```
 
-Gateway meneruskan status dan body response tersebut kepada Client.
+Nilai contoh di atas ilustratif; ID dan tanggal aktual dibuat saat request.
 
-## Error handling
+## 6. Pengembalian
 
-| Kondisi | Response | Penanganan |
+Client memanggil `POST /api/loans/:id/return` dengan JWT pemilik transaksi. Loan Service mengunci baris transaksi, memeriksa pemilik/status, meminta Book Service mengubah status buku menjadi `tersedia`, lalu menyimpan `status='returned'` dan `returned_at`. Pengembalian kedua untuk transaksi yang sama menghasilkan `409`. Jika update transaksi gagal setelah status buku berubah, Loan Service mencoba kompensasi mengembalikan status buku ke `dipinjam`.
+
+## 7. Error yang diharapkan
+
+| Kondisi | Status | Catatan |
 |---|---:|---|
-| API Key tidak ada/salah | 401 | Ditolak Gateway |
-| Body JSON tidak valid | 400 | Ditolak Loan Service |
-| `username`/`bookId` tidak lengkap | 400 | Ditolak Loan Service |
-| `bookId` tidak valid | 400 | Ditolak Loan Service |
-| Buku tidak ditemukan | 404 | Book Service -> Loan Service -> Client |
-| Buku sedang dipinjam | 409 | Loan Service menolak peminjaman |
-| Batas 3 loan aktif | 409 | Loan Service menolak peminjaman |
-| Book Service tidak tersedia saat GET | 502 | Loan Service mengembalikan error |
-| Update Book Service gagal | 502 | Loan Service melakukan rollback transaksi loan |
-| Database Loan Service error | 500 | Loan Service mengembalikan error |
-| Database Book Service error | 502 saat dipanggil Loan Service | Book Service error diteruskan sebagai kegagalan service |
-| Loan Service tidak tersedia | 502 | Gateway mengembalikan error |
+| JWT tidak ada/tidak valid | 401 | Ditolak Gateway atau Loan Service |
+| Body tidak valid / `bookId` tidak valid | 400 | Input harus JSON dengan ID positif |
+| Buku tidak ditemukan | 404 | Tidak ada transaksi baru |
+| Buku sudah tidak tersedia | 409 | Transisi status atomik ditolak |
+| Batas 3 pinjaman aktif tercapai | 409 | Tidak membuat pinjaman tambahan |
+| Book Service tidak tersedia/timeout | 502 | Loan Service tidak dapat menyelesaikan operasi |
+| Gateway tidak dapat mencapai service | 502/504 | Error upstream yang disanitasi Gateway |
+| Insert transaksi gagal setelah reservasi | 500 | Kompensasi status buku dicoba; periksa log bila gagal |
 
 ## Kepemilikan database
 
-Book Service hanya mengakses **Book Database**.
+- `book_db.books` hanya dikelola Book Service.
+- `loan_db.users` dan `loan_db.loans` hanya dikelola Loan Service.
+- Komunikasi antar-service untuk informasi dan status buku dilakukan melalui HTTP API Book Service.
 
-Loan Service hanya mengakses **Loan Database**.
-
-Loan Service tidak menggunakan koneksi, query, tabel, atau file database milik Book Service. Komunikasi antarlayanan dilakukan melalui HTTP API Book Service.
+Skenario ini harus diuji dengan service dan MySQL aktif. Diagram dan contoh response bukan bukti bahwa pengujian runtime telah dijalankan.

@@ -39,3 +39,10 @@ test('loan history includes returned records and return is idempotently rejected
   assert.match(loanServer, /Transaksi ini sudah dikembalikan/);
   assert.match(loanServer, /UPDATE loans SET status = 'returned', returned_at = UTC_TIMESTAMP\(3\)/);
 });
+
+
+test('book seed migration preserves live availability status on duplicate IDs', () => {
+  const bookMigration = fs.readFileSync(path.join(bookDir, 'migrate.js'), 'utf8');
+  assert.match(bookMigration, /ON DUPLICATE KEY UPDATE\s+title = VALUES\(title\),\s+author = VALUES\(author\)/);
+  assert.doesNotMatch(bookMigration, /status = VALUES\(status\)/);
+});

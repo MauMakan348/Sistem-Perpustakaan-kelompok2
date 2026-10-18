@@ -31,17 +31,17 @@ Password hash tidak pernah dimasukkan ke response.
 
 ## Perbedaan API Key dan JWT
 
-- `X-API-Key` adalah credential client untuk mengakses Gateway, terutama untuk pengujian Postman dan client tepercaya.
-- JWT adalah token autentikasi pengguna yang diterbitkan setelah login. Endpoint transaksi Loan Service memverifikasi JWT dan menggunakan username dari token, bukan mempercayai username body.
-- Registrasi dan login dapat diakses tanpa API Key agar browser dapat memulai sesi tanpa menyimpan API Key rahasia. Endpoint API lain dapat menggunakan API Key yang valid atau JWT valid pada Gateway; endpoint transaksi tetap memerlukan JWT valid di Loan Service.
+- `X-API-Key` adalah credential yang diperiksa di Gateway untuk GET buku tanpa JWT dan PATCH status buku. Gateway tidak meneruskan key tersebut ke service internal.
+- JWT adalah token autentikasi pengguna yang diterbitkan setelah login. Endpoint pinjam, riwayat, dan pengembalian selalu memerlukan JWT; Loan Service menggunakan username dari token, bukan mempercayai username body.
+- Registrasi dan login dapat diakses tanpa API Key. GET buku menerima API Key valid atau JWT valid. Penambahan buku memerlukan JWT dengan role `admin`; API Key saja tidak cukup.
 
 ## Environment
 
-Tambahkan `JWT_SECRET` dan `JWT_EXPIRES_IN` pada `loan-service/.env`, serta `JWT_SECRET` pada `api-gateway/.env`. Gunakan secret acak yang panjang dan nilai `JWT_SECRET` yang sama pada kedua service. Jangan commit file `.env` atau memasukkan secret ke JavaScript frontend.
+Untuk mode satu perintah, salin `.env.example` di root menjadi `.env`. Isi `API_KEY`, `JWT_SECRET`, `JWT_EXPIRES_IN`, dan konfigurasi MySQL. Runner root mewariskan environment yang sama ke setiap proses; `JWT_SECRET` harus sama pada Gateway dan Loan Service. `BOOK_DB_NAME` dan `LOAN_DB_NAME` tetap terpisah. Jangan commit file `.env` atau memasukkan secret ke JavaScript frontend.
 
 ## Migration
 
-Jalankan `npm run migrate` di `loan-service`. Migration memeriksa apakah tabel `users` sudah ada. Jika belum, tabel dibuat. Jika sudah ada, migration memeriksa kolom yang diperlukan dan tidak menghapus tabel atau data pengguna. Jika schema yang sudah ada tidak kompatibel, migration berhenti dengan pesan error agar tidak menimpa data.
+Jalankan `npm run migrate` dari root project setelah database dibuat dan environment diatur. Migration memeriksa apakah tabel `users` sudah ada. Jika belum, tabel dibuat. Jika sudah ada, migration memeriksa kolom yang diperlukan dan tidak menghapus tabel atau data pengguna. Jika schema yang sudah ada tidak kompatibel, migration berhenti dengan pesan error agar tidak menimpa data.
 
 ## Browser
 

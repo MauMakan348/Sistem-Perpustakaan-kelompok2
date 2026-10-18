@@ -24,8 +24,7 @@ async function migrate() {
        VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          title = VALUES(title),
-         author = VALUES(author),
-         status = VALUES(status)`,
+         author = VALUES(author)`,
       [book.id, book.title, book.author, book.status]
     );
   }

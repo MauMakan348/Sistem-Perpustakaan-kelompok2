@@ -36,5 +36,5 @@ test("invalid JWT is rejected by the request authenticator", () => {
 test("authenticated user is extracted from a Bearer token", () => {
   const token = createAccessToken({ id: 7, username: "uji_user" });
   const user = getAuthenticatedUser({ headers: { authorization: `Bearer ${token}` } });
-  assert.deepEqual(user, { id: "7", username: "uji_user" });
+  assert.deepEqual(user, { id: "7", username: "uji_user", role: "user" });
 });

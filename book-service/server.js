@@ -8,7 +8,7 @@ require("dotenv").config();
 const http = require("http");
 const { pool, checkDatabaseConnection } = require("./db");
 
-const PORT = process.env.PORT || 4001;
+const PORT = Number(process.env.BOOK_PORT || process.env.PORT || 4001);
 
 function sendJSON(res, statusCode, data) {
   const body = JSON.stringify(data);

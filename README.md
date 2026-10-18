@@ -1,205 +1,227 @@
-# Sistem Peminjaman Buku Perpustakaan — Microservice
+# Sistem Perpustakaan — Microservices
 
-Project ini mengembangkan aplikasi perpustakaan web menjadi sistem Node.js dengan API Gateway, Book Service, Loan Service, dan dua database MySQL yang dimiliki service masing-masing. Client web dan Postman mengakses API melalui Gateway `http://localhost:4000`.
+Project ini mempertahankan tiga proses backend terpisah: API Gateway, Book Service, dan Loan Service. Jalankan dari root project dengan satu perintah `npm start`; runner menyalakan kedua service internal lebih dahulu, menunggu port-nya siap, lalu menyalakan Gateway. Ini **bukan monolith**: setiap service tetap berjalan sebagai proses Node.js terpisah dan memiliki tanggung jawab/database masing-masing.
 
-## Arsitektur sebelum dan sesudah
+## 1. Arsitektur sebelum dan sesudah
 
-**Sebelum:** aplikasi perpustakaan sederhana berbasis HTML, CSS, dan JavaScript dengan data buku/peminjaman berbasis JSON atau penyimpanan lokal pada tahap awal. Pada tahap microservice awal, service dapat diakses langsung oleh client.
+### Sebelum pengembangan
 
-**Sesudah:**
+Versi awal menggunakan frontend HTML/CSS/JavaScript dan data yang disimpan dalam JSON/localStorage pada tahap awal. Pada tahap microservice sebelumnya, Book Service dan Loan Service sudah dipisah, tetapi belum ada satu entry point yang mengelola startup seluruh service secara terkoordinasi.
 
 ```text
-Browser / Postman
-       | HTTP + aturan API Key/JWT
-       v
+Frontend / Client
+   |             |
+   v             v
+Book Service   Loan Service
+   |             |
+ books data    loans data
+```
+
+### Sesudah pengembangan
+
+```text
+Frontend / Postman
+        |
+        v
 API Gateway :4000
-   |                 |
-   v                 v
-Book Service :4001  Loan Service :4002
-   |                 |       |
-   v                 |       +---- HTTP API ----> Book Service
-book_db (MySQL)      v
-                  loan_db (MySQL)
+   |             |
+   v             v
+Book Service   Loan Service
+ :4001            :4002
+   ^                |
+   |---- HTTP API --|
+   |
+book_db         loan_db
 ```
 
-Gateway merutekan request dan meneruskan response, bukan menjalankan aturan bisnis peminjaman. Book Service hanya mengelola `book_db`; Loan Service hanya mengelola `loan_db` dan mengambil data/mengubah status buku melalui HTTP API Book Service. File `books.json` dan `loans.json` dipertahankan sebagai sumber data migration lama, bukan persistence aktif.
+- **API Gateway**: satu entry point untuk client, autentikasi route, routing, dan forwarding.
+- **Book Service**: data buku dan status ketersediaan di `book_db`.
+- **Loan Service**: pengguna, JWT, transaksi pinjam/kembali di `loan_db`; memanggil Book Service melalui HTTP.
+- Root runner menjalankan ketiga proses dan menghentikan semuanya ketika menerima Ctrl+C/SIGTERM. Ketiga proses tetap terpisah.
 
-## Komponen dan teknologi
+## 2. Teknologi
 
-| Komponen | Fungsi | Port default |
-|---|---|---:|
-| API Gateway | Entry point, pemeriksaan API Key/JWT/role sesuai route, routing dan forwarding | 4000 |
-| Book Service | Daftar/detail buku, penambahan buku, perubahan status buku | 4001 |
-| Loan Service | Registrasi/login, JWT, peminjaman, pengembalian, riwayat transaksi | 4002 |
-| Book DB | Tabel `books` | MySQL 3306 |
-| Loan DB | Tabel `users` dan `loans` | MySQL 3306 |
+- Node.js dengan modul `http` native (Express tidak digunakan).
+- MySQL dan `mysql2`.
+- `dotenv` untuk konfigurasi environment.
+- `bcryptjs` untuk hashing password.
+- `jsonwebtoken` untuk JWT.
+- Frontend HTML, CSS, dan Vanilla JavaScript.
+- Postman Collection untuk pengujian API.
 
-Backend memakai Node.js native `http` (tanpa Express), `mysql2`, `dotenv`, `bcryptjs`, dan `jsonwebtoken`. Frontend memakai HTML, CSS, dan Vanilla JavaScript. Postman digunakan untuk pengujian API.
+## 3. Instalasi dari awal
 
-## Persyaratan dan instalasi
+Prasyarat: Node.js/npm dan MySQL yang sedang berjalan.
 
-Pastikan Node.js/npm dan MySQL tersedia. Dari root project, pasang dependency di tiap service:
-
-```bash
-cd book-service && npm install
-cd ../loan-service && npm install
-cd ../api-gateway && npm install
-```
-
-Salin masing-masing `.env.example` menjadi `.env`. Jangan commit atau membagikan `.env` berisi credential nyata.
-
-### Environment variable
-
-`book-service/.env`:
-
-```env
-PORT=4001
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=book_db
-DB_USER=root
-DB_PASSWORD=isi_password_mysql_lokal
-```
-
-`loan-service/.env`:
-
-```env
-PORT=4002
-BOOK_SERVICE_HOST=127.0.0.1
-BOOK_SERVICE_PORT=4001
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=loan_db
-DB_USER=root
-DB_PASSWORD=isi_password_mysql_lokal
-JWT_SECRET=ganti_dengan_secret_random_minimal_32_byte
-JWT_EXPIRES_IN=2h
-```
-
-`api-gateway/.env`:
-
-```env
-PORT=4000
-BOOK_SERVICE_HOST=127.0.0.1
-BOOK_SERVICE_PORT=4001
-LOAN_SERVICE_HOST=127.0.0.1
-LOAN_SERVICE_PORT=4002
-API_KEY=ganti_dengan_api_key_lokal
-JWT_SECRET=gunakan_secret_yang_sama_dengan_loan_service
-```
-
-Gateway mewajibkan `API_KEY` dan `JWT_SECRET` (minimal 32 byte). `JWT_SECRET` pada Gateway dan Loan Service harus sama. Nilai di atas adalah contoh konfigurasi, bukan secret siap pakai.
-
-## Menyiapkan database dan menjalankan aplikasi
-
-1. Buat database di MySQL:
+1. Buka terminal di root project.
+2. Salin `.env.example` menjadi `.env`.
+3. Edit `.env`, isi kredensial MySQL, `API_KEY`, dan `JWT_SECRET`. Buat `API_KEY` acak dan `JWT_SECRET` acak minimal 32 byte. Jangan membagikan atau commit `.env`.
+4. Buat database MySQL jika belum ada:
 
    ```sql
-   CREATE DATABASE book_db CHARACTER SET utf8mb4;
-   CREATE DATABASE loan_db CHARACTER SET utf8mb4;
+   CREATE DATABASE book_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE DATABASE loan_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
-2. Jalankan migration untuk membuat/menyesuaikan schema dan mengimpor data JSON lama bila tersedia:
+
+5. Instal dependency di root:
 
    ```bash
-   cd book-service && npm run migrate
-   cd ../loan-service && npm run migrate
+   npm install
    ```
-3. Jalankan setiap service di terminal terpisah:
+
+6. Buat/upgrade tabel dan impor data JSON lama yang tersedia:
 
    ```bash
-   cd book-service && npm start
+   npm run migrate
    ```
-   ```bash
-   cd loan-service && npm start
-   ```
-   ```bash
-   cd api-gateway && npm start
-   ```
-4. Buka `frontend/index.html` di browser. Frontend menggunakan Gateway di port 4000; jangan arahkan client ke port internal 4001/4002.
-5. Import `postman/Sistem-Perpustakaan.postman_collection.json` ke Postman dan import environment `postman/Sistem-Perpustakaan.postman_environment.json`. Pilih environment itu, lalu isi `apiKey` dengan API key lokal yang sama dengan `api-gateway/.env`. Isi username/password uji sesuai akun yang terdaftar.
 
-Jalankan migration sebelum service diuji. Akun admin tidak dibuat melalui registrasi publik: registrasi menghasilkan role `user`. Untuk memberi role admin, operator database tepercaya dapat menjalankan query berikut pada `loan_db` dan pengguna harus login ulang:
+   Migration tidak menghapus file JSON. Data JSON diimpor sebagai seed; untuk ID buku yang sudah ada, migration memperbarui judul/penulis tetapi mempertahankan status ketersediaan aktif. Migration Loan Service menambahkan kolom `status` dan `returned_at` yang belum ada pada tabel lama tanpa menghapus transaksi yang ada.
+
+7. Jalankan semua backend dengan satu perintah:
+
+   ```bash
+   npm start
+   ```
+
+   Runner menyalakan Book Service dan Loan Service, menunggu port siap, lalu menjalankan API Gateway. Jika service atau koneksi MySQL gagal saat startup, penyebab dilaporkan dan proses yang sudah berjalan dihentikan. Tekan `Ctrl+C` untuk menghentikan semua proses.
+
+Gateway: `http://localhost:4000`. Frontend statis ada di `frontend/index.html`; buka melalui server statis lokal jika browser memblokir permintaan file langsung. Frontend mengakses Gateway pada port 4000.
+
+## 4. Environment variables
+
+Konfigurasi utama dibaca dari `.env` di root project. File `.env.example` hanya berisi placeholder.
+
+| Variable | Default/contoh | Kegunaan |
+|---|---|---|
+| `GATEWAY_PORT` | `4000` | Port Gateway |
+| `BOOK_PORT` | `4001` | Port Book Service |
+| `LOAN_PORT` | `4002` | Port Loan Service |
+| `BOOK_SERVICE_HOST` | `127.0.0.1` | Host Book Service yang dipanggil Gateway/Loan Service |
+| `BOOK_SERVICE_PORT` | `4001` | Port Book Service internal |
+| `LOAN_SERVICE_HOST` | `127.0.0.1` | Host Loan Service yang dipanggil Gateway |
+| `LOAN_SERVICE_PORT` | `4002` | Port Loan Service internal |
+| `API_KEY` | wajib diisi | Kunci akses tepercaya pada Gateway; jangan letakkan di frontend |
+| `JWT_SECRET` | wajib, minimal 32 byte | Signing secret JWT, nilainya sama untuk Gateway dan Loan Service |
+| `JWT_EXPIRES_IN` | `2h` | Masa berlaku token |
+| `DB_HOST`, `DB_PORT` | `127.0.0.1`, `3306` | Host/port MySQL |
+| `DB_USER`, `DB_PASSWORD` | sesuai konfigurasi lokal | Kredensial MySQL |
+| `BOOK_DB_NAME` | `book_db` | Database milik Book Service |
+| `LOAN_DB_NAME` | `loan_db` | Database milik Loan Service |
+| `STARTUP_TIMEOUT_MS` | `30000` | Batas waktu menunggu service siap |
+
+Gunakan `API_KEY` dan `JWT_SECRET` berbeda satu sama lain. API Key adalah kunci yang diperiksa Gateway; JWT adalah identitas pengguna yang diterbitkan setelah login. Jangan mengirim API Key ke frontend publik atau menyimpan nilai rahasia di Postman Collection yang dipublikasikan.
+
+## 5. Registrasi, login, dan token
+
+Registrasi akun baru dengan role `user`:
+
+```http
+POST http://localhost:4000/api/register
+Content-Type: application/json
+```
+
+```json
+{ "username": "mahasiswa01", "password": "password-lokal-123" }
+```
+
+Contoh response `201`:
+
+```json
+{ "message": "Registrasi berhasil.", "user": { "id": 1, "username": "mahasiswa01" } }
+```
+
+Login:
+
+```http
+POST http://localhost:4000/api/login
+Content-Type: application/json
+```
+
+```json
+{ "username": "mahasiswa01", "password": "password-lokal-123" }
+```
+
+Response sukses `200` berisi `token`, `tokenType: "Bearer"`, `expiresIn`, dan `user`. Gunakan token untuk endpoint pengguna:
+
+```http
+Authorization: Bearer <TOKEN_HASIL_LOGIN>
+```
+
+Registrasi normal tidak membuat administrator. Untuk memberi hak admin, registrasikan akun terlebih dahulu, lalu operator database yang berwenang menjalankan perintah terencana berikut dengan username yang tepat:
 
 ```sql
-UPDATE users SET role = 'admin' WHERE username = 'username_yang_dipilih';
+UPDATE loan_db.users SET role = 'admin' WHERE username = 'username_yang_dipilih';
 ```
 
-Jangan memberikan akses database kepada pengguna umum.
+Logout frontend menghapus token dari `sessionStorage`; token juga kedaluwarsa sesuai `JWT_EXPIRES_IN`. Jangan pernah memasukkan JWT signing secret ke client.
 
-## Autentikasi: API Key dan JWT
+## 6. Cara menggunakan API Key
 
-- `POST /api/register` dan `POST /api/login` tidak memerlukan API Key.
-- `X-API-Key: {{apiKey}}` adalah credential client untuk Gateway, bukan identitas pengguna. GET buku menerima API Key valid atau JWT valid; `PATCH /api/books/:id/status` memerlukan API Key valid.
-- Route peminjaman, riwayat, dan pengembalian memerlukan JWT pengguna yang valid. API Key saja tidak cukup.
-- `POST /api/books` memerlukan JWT dengan `role: admin`; akun registrasi baru ber-role `user` dan akan mendapat `403` jika mencoba menambah buku.
-- Login mengembalikan `token`. Kirim pada request terlindungi sebagai `Authorization: Bearer <token>`. Postman Collection menyimpan token hasil login ke variable `token` secara otomatis.
+Untuk membaca buku dengan API Key atau memanggil endpoint status internal melalui Gateway, gunakan header:
 
-### Registrasi
+```http
+X-API-Key: <API_KEY_DARI_ENV_ROOT>
+```
 
-`POST {{baseUrl}}/api/register`
+Gateway memeriksa key dan **tidak meneruskan header `X-API-Key` ke service internal**. API Key tidak menggantikan JWT untuk peminjaman, riwayat, atau pengembalian. Registrasi/login tidak memerlukan API Key. Penambahan buku memerlukan JWT dengan role `admin`.
+
+## 7. Endpoint API Gateway
+
+| Method | Path | Auth | Fungsi |
+|---|---|---|---|
+| `POST` | `/api/register` | Tidak perlu | Registrasi user |
+| `POST` | `/api/login` | Tidak perlu | Login dan memperoleh JWT |
+| `GET` | `/api/books` | API Key **atau** JWT | Daftar buku |
+| `GET` | `/api/books/:id` | API Key **atau** JWT | Detail buku |
+| `POST` | `/api/books` | JWT role `admin` | Tambah buku |
+| `PATCH` | `/api/books/:id/status` | API Key | Perubahan status untuk operasi tepercaya; umumnya dipanggil Loan Service melalui HTTP internal |
+| `POST` | `/api/loans` | JWT | Pinjam buku; `bookId` pada body |
+| `GET` | `/api/loans/:username` | JWT pemilik | Riwayat transaksi pengguna dari database (termasuk status aktif/dikembalikan) |
+| `POST` | `/api/loans/:id/return` | JWT pemilik transaksi | Kembalikan berdasarkan ID transaksi peminjaman |
+
+### Daftar dan detail buku
+
+```http
+GET /api/books
+X-API-Key: <API_KEY>
+```
+
+Contoh response `200` berupa array:
 
 ```json
-{ "username": "mahasiswa01", "password": "PasswordUji123!" }
+[{ "id": 2, "title": "Contoh Judul", "author": "Contoh Penulis", "status": "tersedia" }]
 ```
 
-Contoh response `201 Created`:
+Detail:
+
+```http
+GET /api/books/2
+Authorization: Bearer <TOKEN>
+```
+
+Response `200` berupa objek buku; ID yang tidak ada menghasilkan `404`.
+
+### Menambah buku
+
+Hanya token dengan role `admin`:
+
+```http
+POST /api/books
+Authorization: Bearer <TOKEN_ADMIN>
+Content-Type: application/json
+```
 
 ```json
-{
-  "message": "Registrasi berhasil.",
-  "user": { "id": 1, "username": "mahasiswa01" }
-}
+{ "title": "Buku Baru", "author": "Nama Penulis" }
 ```
 
-Username dinormalisasi menjadi huruf kecil, 3–32 karakter, hanya huruf/angka/underscore. Password minimal 8 karakter dan maksimum 72 byte. Username duplikat menghasilkan `409`.
+Response `201` berisi `message` dan objek `book` dengan status awal `tersedia`. Judul dan penulis wajib berupa string tidak kosong. Token user biasa menghasilkan `403`; tanpa token valid menghasilkan `401`.
 
-### Login dan token
-
-`POST {{baseUrl}}/api/login`
-
-```json
-{ "username": "mahasiswa01", "password": "PasswordUji123!" }
-```
-
-Contoh response `200 OK` (token disingkat):
-
-```json
-{
-  "message": "Login berhasil.",
-  "token": "<JWT_DARI_RESPONSE>",
-  "tokenType": "Bearer",
-  "expiresIn": "2h",
-  "user": { "id": 1, "username": "mahasiswa01", "role": "user" }
-}
-```
-
-Gunakan token aktual dari response, bukan teks placeholder. Token kedaluwarsa harus diperoleh ulang dengan login.
-
-## Endpoint API melalui Gateway
-
-Semua URL berikut memakai base URL `http://localhost:4000`.
-
-| Method dan path | Header / body | Akses dan hasil utama |
-|---|---|---|
-| `POST /api/register` | JSON `{ "username", "password" }` | Publik; `201`, username duplikat `409`, input invalid `400` |
-| `POST /api/login` | JSON `{ "username", "password" }` | Publik; `200` berisi JWT, kredensial salah `401` |
-| `GET /api/books` | `X-API-Key` valid atau JWT valid | `200`, array buku berisi `id`, `title`, `author`, `status` |
-| `GET /api/books/:id` | `X-API-Key` valid atau JWT valid | `200` detail; `404` jika tidak ada |
-| `POST /api/books` | `Authorization: Bearer <JWT admin>`, JSON `{ "title", "author" }` | `201`; `401` token tidak valid/tidak ada, `403` bukan admin, `400` input invalid |
-| `POST /api/loans` | `Authorization: Bearer <JWT>`, JSON `{ "bookId": 2 }` | `201`; `400` ID invalid, `404` buku tidak ada, `409` buku tak tersedia/batas tercapai |
-| `GET /api/loans/:username` | `Authorization: Bearer <JWT>` | `200` array peminjaman aktif milik akun yang login; akses username lain `403` |
-| `POST /api/loans/:id/return` | `Authorization: Bearer <JWT>` | `200` transaksi dikembalikan; `404` transaksi tidak ada, `403` bukan pemilik, `409` sudah dikembalikan |
-| `PATCH /api/books/:id/status` | `X-API-Key` valid, JSON `{ "status": "dipinjam" }` atau `{ "status": "tersedia" }` | Endpoint operasi internal/trusted; `200`, konflik transisi `409` |
-
-Untuk `POST /api/loans`, username peminjam diambil dari JWT, bukan dari body. Batasnya 3 peminjaman aktif per pengguna dengan masa pinjam 7 hari. Saat pengembalian berhasil, `status` transaksi menjadi `returned`, `returnedAt` diisi, dan status buku menjadi `tersedia`. Endpoint `GET /api/loans/:username` menampilkan pinjaman aktif; detail transaksi yang telah dikembalikan tersimpan pada database, tetapi tidak termasuk daftar aktif tersebut.
-
-### Contoh peminjaman
-
-Request:
+### Meminjam buku
 
 ```http
 POST /api/loans
-Authorization: Bearer <JWT_DARI_LOGIN>
+Authorization: Bearer <TOKEN>
 Content-Type: application/json
 ```
 
@@ -207,71 +229,86 @@ Content-Type: application/json
 { "bookId": 2 }
 ```
 
-Contoh response `201 Created`:
+Username diambil dari token, bukan dari body. Response `201` berisi transaksi dengan `id`, `username`, `bookId`, `bookTitle`, `borrowDate`, `dueDate`, dan `status: "active"`. Batasnya maksimal 3 pinjaman aktif per pengguna dan masa pinjam 7 hari. Buku yang tidak tersedia menghasilkan `409`; buku tidak ditemukan menghasilkan `404`.
 
-```json
-{
-  "message": "Buku berhasil dipinjam.",
-  "loan": {
-    "id": 1780000000000000,
-    "username": "mahasiswa01",
-    "bookId": 2,
-    "bookTitle": "Contoh Judul",
-    "borrowDate": "2026-10-16T10:00:00.000Z",
-    "dueDate": "2026-10-23T10:00:00.000Z",
-    "status": "active"
-  }
-}
+### Mengembalikan buku
+
+Gunakan **ID transaksi pinjaman**, bukan ID buku:
+
+```http
+POST /api/loans/1712345678000123/return
+Authorization: Bearer <TOKEN_PEMILIK>
 ```
 
-Nilai ID, tanggal, dan judul di atas hanya ilustrasi bentuk response; gunakan nilai aktual dari server.
+Response `200` memuat `loan.status: "returned"` dan `returnedAt`. Transaksi yang sudah dikembalikan kembali akan menghasilkan `409`; transaksi yang bukan milik pengguna menghasilkan `403`.
 
-### Contoh pengembalian
+### Riwayat transaksi
 
-`POST /api/loans/:id/return` menggunakan `id` transaksi pinjaman (loan ID), bukan ID buku. Contoh response `200 OK`:
-
-```json
-{
-  "message": "Buku berhasil dikembalikan.",
-  "loan": {
-    "id": 1780000000000000,
-    "username": "mahasiswa01",
-    "bookId": 2,
-    "bookTitle": "Contoh Judul",
-    "status": "returned",
-    "returnedAt": "2026-10-16T11:00:00.000Z"
-  }
-}
+```http
+GET /api/loans/mahasiswa01
+Authorization: Bearer <TOKEN_MAHASISWA01>
 ```
 
-## Skenario Postman
+Response `200` berupa array transaksi dengan `status` (`active` atau `returned`) dan `returnedAt` (null jika belum dikembalikan). Username pada path harus sama dengan pemilik token, jika tidak hasilnya `403`.
 
-Gunakan Collection dan environment yang disertakan. Jalankan berurutan:
+## 8. Postman
 
-1. Register (username baru), lalu Login; request login menyimpan JWT ke `token`.
-2. GET daftar buku dan GET detail buku.
-3. POST penambahan buku dengan JWT admin; JWT dari akun `user` seharusnya ditolak `403`.
-4. POST peminjaman dengan `bookId` yang tersedia; Collection menyimpan `loanId` dari response untuk request return.
-5. GET riwayat aktif pengguna dengan username yang sama dengan token.
-6. POST return menggunakan `loanId`, lalu coba return sekali lagi untuk memastikan transaksi kedua ditolak `409`.
-7. Uji API Key salah/tidak ada, token tidak ada/invalid, buku tidak ditemukan, buku sudah dipinjam, dan service internal mati (Gateway diharapkan memberi `502`, atau `504` untuk timeout).
+File tersedia di `postman/`:
 
-Expected status code dalam deskripsi Collection adalah ekspektasi skenario, bukan bukti bahwa seluruh skenario telah dieksekusi. Untuk detail test, lihat `docs/postman-testing.md`.
+- `Sistem-Perpustakaan.postman_collection.json`
+- `Sistem-Perpustakaan.postman_environment.json`
 
-## Error umum
+Import keduanya ke Postman dan pilih environment `Sistem Perpustakaan - Local`. Isi `apiKey` dan `password` lokal secara manual; jangan ekspor environment berisi credential. Jalankan urutan umum:
 
-- **Gateway berhenti saat startup:** pastikan `API_KEY` ada dan `JWT_SECRET` minimal 32 byte.
-- **`401` pada route pengguna:** login ulang, gunakan `Authorization: Bearer <token>`, dan pastikan token belum kedaluwarsa.
-- **`401` pada GET buku tanpa token:** tambahkan `X-API-Key` yang sama dengan konfigurasi Gateway.
-- **`403` saat menambah buku:** hanya JWT role `admin` yang dapat menambah buku; registrasi publik membuat role `user`.
-- **`409` saat pinjam:** buku sudah dipinjam, batas 3 buku aktif tercapai, atau status berubah bersamaan. Gunakan buku yang tersedia dan periksa riwayat aktif.
-- **`502` / `504`:** pastikan service tujuan aktif dan host/port pada `.env` sesuai.
-- **Error koneksi MySQL:** pastikan MySQL aktif, database sudah dibuat, credential benar, lalu jalankan `npm run migrate`.
-- **Module tidak ditemukan:** jalankan `npm install` pada folder service yang error.
-- **`409` saat return:** transaksi sudah pernah dikembalikan; gunakan loan ID transaksi yang masih aktif.
+1. Registrasi user baru (username harus unik).
+2. Login pengguna; test script menyimpan JWT ke variable `token`.
+3. GET daftar/detail buku.
+4. Login dengan akun role admin untuk request tambah buku (role admin harus ditetapkan oleh operator DB).
+5. POST peminjaman; request menyimpan `loanId` dari response sukses.
+6. GET riwayat dengan username yang cocok dengan token.
+7. POST pengembalian menggunakan `{{loanId}}`.
+8. Ulangi return untuk menguji `409`, dan uji API Key salah, token tidak ada, buku tidak ditemukan, dan user mencoba mengakses riwayat orang lain.
 
-## AI Coding Tool dan verifikasi
+Semua request normal dari klien ditujukan ke `http://localhost:4000`; jangan mengirim request klien langsung ke port 4001/4002. Untuk hasil pengujian, lihat `docs/postman-testing.md` dan jalankan request terhadap lingkungan lokal.
 
-ChatGPT digunakan untuk membantu analisis requirement, perencanaan perubahan, debugging, pembuatan kode/dokumentasi, serta skenario Postman. Prompt yang tercatat tersedia pada `docs/prompts.md`; evaluasi dan keterbatasan pemeriksaan ada di `docs/ai-usage.md`.
+## 9. Error umum
 
-Pemeriksaan terakhir yang tercatat pada patch audit: syntax check untuk service/migration/frontend lulus; 4 tes source-level regresi dan 6 tes keamanan Gateway lulus. Tes `loan-service/test/auth.test.js` belum berjalan sukses karena dependency `bcryptjs` tidak tersedia saat pengujian dan instalasi dependency timeout. Tes end-to-end dengan MySQL aktif belum dijalankan. Karena itu hasil tersebut tidak boleh ditafsirkan sebagai bukti semua alur runtime telah lulus.
+- **`API_KEY belum diatur` / `JWT_SECRET belum diatur`:** buat `.env` dari `.env.example`; JWT secret harus minimal 32 byte.
+- **Koneksi MySQL gagal / service tidak siap:** pastikan MySQL aktif, database `book_db` dan `loan_db` dibuat, kredensial benar, lalu jalankan `npm run migrate`.
+- **Port sudah dipakai:** ubah `GATEWAY_PORT`, `BOOK_PORT`, atau `LOAN_PORT` beserta port service tujuan yang terkait di `.env`, lalu mulai ulang.
+- **`401`:** cek API Key untuk route yang memerlukannya atau login kembali dan gunakan `Authorization: Bearer <token>`.
+- **`403`:** token tidak punya role/ownership yang diperlukan; penambahan buku perlu role admin dan riwayat/return harus milik token aktif.
+- **`409`:** buku tidak tersedia, batas pinjaman aktif tercapai, atau transaksi sudah dikembalikan.
+- **`502` / `504`:** service internal tidak tersedia atau timeout; periksa log berlabel service di terminal `npm start`.
+- **Username sudah dipakai:** pilih username lain; registrasi duplikat menghasilkan `409`.
+
+## 10. Tes dan status verifikasi
+
+Perintah yang tersedia:
+
+```bash
+npm run check
+npm test
+```
+
+Hasil pemeriksaan yang benar-benar dijalankan saat paket ini disusun:
+
+| Pemeriksaan | Status | Hasil |
+|---|---|---|
+| `npm run check` | PASS | Syntax check runner dan service utama berhasil. |
+| `node --check` seluruh file JavaScript | PASS | Tidak ditemukan syntax error. |
+| `node --test api-gateway/test/security-audit.test.js loan-service/test/regression-audit.test.js` | PASS | 11 tes source-level lulus. Tes ini memeriksa pola source, bukan simulasi DB/concurrency runtime. |
+| `npm ls --package-lock-only --all` | PASS | Dependency tree pada lockfile terbaca dan konsisten dengan package manifest. |
+| `npm test` | FAIL | 11 lulus, 1 file tes gagal dimuat karena `Cannot find module 'bcryptjs'`; dependency belum terpasang di lingkungan penyusunan. |
+| `npm start` | FAIL / terhambat lingkungan | Runner berhenti sebelum startup karena modul `dotenv` belum terpasang. Instalasi dependency dicoba tetapi timeout saat mengakses registry. |
+| Tes end-to-end dengan MySQL aktif, pinjam/kembali, dan shutdown proses | NOT TESTED | Perlu `npm install`, MySQL aktif, migration, lalu pengujian runtime/Postman. |
+
+Tes autentikasi menguji hashing/JWT tanpa database, tetapi belum bisa dijalankan di lingkungan ini karena dependency belum terpasang. Jalankan `npm install`, lalu `npm test` dan pengujian Postman dengan MySQL aktif untuk memverifikasi seluruh alur. Jangan menyimpulkan E2E lulus hanya dari tes source-level.
+
+## 11. Dokumen pendukung
+
+- `docs/architecture.md` — arsitektur, ownership database, alur lintas-service.
+- `docs/authentication.md` — aturan autentikasi.
+- `docs/e2e-loan-flow.md` — alur pinjam lintas-service.
+- `docs/postman-testing.md` — skenario Postman.
+- `docs/ai-usage.md` dan `docs/prompts.md` — penggunaan AI Coding Tool dan prompt pengembangan.

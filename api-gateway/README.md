@@ -1,117 +1,14 @@
 # API Gateway
 
-API Gateway adalah satu-satunya entry point API untuk client.
+Gateway adalah satu-satunya entry point yang digunakan frontend dan Postman: `http://localhost:4000` secara default. Dari root project jalankan `npm start`; runner root menyalakan Book Service dan Loan Service lebih dahulu lalu memulai Gateway setelah keduanya siap. Service tetap berupa proses terpisah.
 
-- Port: `4000`
-- Book Service internal: `4001`
-- Loan Service internal: `4002`
-- API authentication: header `X-API-Key`
+Konfigurasi untuk mode satu perintah berada di `.env` root project. Lihat root `.env.example` dan `README.md`. `X-API-Key` diperiksa di Gateway dan tidak diteruskan ke service internal. Registrasi/login tidak perlu API Key; route peminjaman, riwayat, dan pengembalian perlu JWT; tambah buku perlu JWT role admin.
 
-## Konfigurasi
-
-Salin `.env.example` menjadi `.env`, lalu isi `API_KEY` dengan nilai lokal yang hanya diketahui oleh client yang dipercaya.
-
-Jangan commit file `.env`.
-
-## Postman
-
-Request:
+Contoh daftar buku:
 
 ```http
 GET http://localhost:4000/api/books
+X-API-Key: <API_KEY_LOKAL>
 ```
 
-Header:
-
-```text
-X-API-Key: <API_KEY>
-```
-
-### API Key benar
-
-Gateway meneruskan request ke Book Service. Jika Book Service berjalan, response sukses diteruskan apa adanya, misalnya:
-
-```json
-[
-  {
-    "id": 1,
-    "title": "Cara Membedakan Tangan Kanan dan Tangan Kiri",
-    "author": "Andi Pratama",
-    "status": "dipinjam"
-  }
-]
-```
-
-### API Key tidak ada atau salah
-
-Gateway tidak meneruskan request dan mengembalikan:
-
-```http
-HTTP/1.1 401 Unauthorized
-```
-
-```json
-{
-  "error": "API Key tidak valid atau tidak ditemukan."
-}
-```
-
-## Catatan frontend
-
-Frontend browser tidak menyimpan API key rahasia. Browser hanya menggunakan API Gateway pada port `4000`. Untuk pengujian API yang membutuhkan API key, gunakan Postman atau client yang dapat menyimpan credential secara aman.
-
-## Contoh alur end-to-end peminjaman
-
-Gunakan Postman:
-
-```http
-POST http://localhost:4000/api/loans
-```
-
-Header:
-
-```text
-X-API-Key: <API_KEY>
-Content-Type: application/json
-```
-
-Body:
-
-```json
-{
-  "username": "kokop",
-  "bookId": 2
-}
-```
-
-Gateway memeriksa API Key lalu meneruskan request ke Loan Service. Loan Service meminta data buku ke Book Service melalui HTTP API. Jika buku tersedia, Loan Service menyimpan transaksi pada Loan Database, lalu meminta Book Service mengubah status buku menjadi `dipinjam`. Response akhir dikembalikan melalui Gateway.
-
-Dokumentasi tahap demi tahap dan contoh response tersedia di `docs/e2e-loan-flow.md`.
-
-
-## Registrasi, login, dan JWT
-
-- `POST /api/register` dan `POST /api/login` diteruskan ke Loan Service dan dapat dipanggil tanpa API Key agar browser bisa memulai sesi.
-- Request API lain dapat menggunakan `X-API-Key` untuk client tepercaya atau `Authorization: Bearer <JWT>` untuk pengguna yang sudah login.
-- Gateway memverifikasi tanda tangan JWT untuk mengizinkan routing dengan token; Loan Service tetap memvalidasi JWT pada endpoint transaksi dan memeriksa bahwa username path sesuai dengan identitas token.
-- `JWT_SECRET` harus diisi dengan nilai random yang sama pada `.env` API Gateway dan Loan Service. Jangan memasukkan secret tersebut ke frontend atau Git.
-
-Contoh registrasi:
-
-```http
-POST http://localhost:4000/api/register
-Content-Type: application/json
-
-{ "username": "mahasiswa01", "password": "password-kuat-123" }
-```
-
-Contoh login:
-
-```http
-POST http://localhost:4000/api/login
-Content-Type: application/json
-
-{ "username": "mahasiswa01", "password": "password-kuat-123" }
-```
-
-Login sukses mengembalikan `token`. Gunakan token pada request pengguna: `Authorization: Bearer <token>`.
+Jika API Key salah atau tidak ada dan tidak ada JWT valid, Gateway mengembalikan `401`. Jika service upstream tidak tersedia, Gateway mengembalikan `502`; jika timeout, `504`. Port 4001/4002 adalah port internal dan tidak ditujukan untuk request client normal.

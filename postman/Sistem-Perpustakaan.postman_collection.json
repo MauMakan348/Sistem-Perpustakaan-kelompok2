@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "7d8b2d10-9c3a-4f36-9f1b-5e2c1d7a9012",
     "name": "Sistem Perpustakaan - API Gateway",
-    "description": "Skenario API melalui Gateway. Import dan pilih Sistem-Perpustakaan.postman_environment.json. Isi apiKey lokal dan username/password uji. Registrasi/login tidak memakai API Key. Login menyimpan JWT ke environment variable token; peminjaman menyimpan loanId untuk request pengembalian. POST /api/books memerlukan JWT role admin; transaksi loan memerlukan JWT pengguna.",
+    "description": "Request client ditujukan ke API Gateway. Import environment lokal, isi apiKey/password/admin credentials sendiri. Register/login tidak memerlukan API Key; transaksi membutuhkan JWT user; tambah buku membutuhkan JWT role admin. Admin harus ditetapkan oleh operator DB, tidak ada akun admin default.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -35,7 +35,7 @@
             "exec": [
               "if (pm.response.code === 200) {",
               "  const body = pm.response.json();",
-              "  if (body.token) pm.environment.set(\"token\", body.token);",
+              "  if (body.token) { pm.environment.set(\"token\", body.token); pm.environment.set(\"userToken\", body.token); }",
               "  if (body.user && body.user.username) pm.environment.set(\"username\", body.user.username);",
               "}",
               "pm.test(\"Login mengembalikan token atau error yang diharapkan\", function () {",
@@ -59,6 +59,42 @@
         },
         "url": "{{baseUrl}}/api/login",
         "description": "Login pengguna. Jika berhasil, test script menyimpan JWT pada collection variable token. Expected: 200; password salah: 401; input tidak lengkap: 400."
+      },
+      "response": []
+    },
+    {
+      "name": "0B. Login Admin dan Simpan Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  if (body.token) pm.environment.set(\"adminToken\", body.token);",
+              "}",
+              "pm.test(\"Login admin berhasil atau mengembalikan error yang diharapkan\", function () {",
+              "  pm.expect([200, 400, 401]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{adminUsername}}\",\n  \"password\": \"{{adminPassword}}\"}"
+        },
+        "url": "{{baseUrl}}/api/login",
+        "description": "Login dengan akun yang role-nya telah ditetapkan admin oleh operator database. Menyimpan JWT ke adminToken. Registrasi normal tidak memberikan role admin."
       },
       "response": []
     },
@@ -143,7 +179,7 @@
           },
           {
             "key": "Authorization",
-            "value": "Bearer {{token}}"
+            "value": "Bearer {{adminToken}}"
           }
         ],
         "body": {
@@ -151,7 +187,7 @@
           "raw": "{\n  \"title\": \"Buku Uji Tambah\",\n  \"author\": \"Penulis Uji\"\n}"
         },
         "url": "{{baseUrl}}/api/books",
-        "description": "Login dengan akun yang sudah memiliki role=admin; gunakan token hasil login. Expected: 201, status buku otomatis tersedia dan ID dibuat MySQL. Akun registrasi baru ber-role user dan tidak bisa memakai request ini."
+        "description": "Login dengan akun yang sudah memiliki role=admin; gunakan token hasil login. Expected: 201, status buku otomatis tersedia dan ID dibuat MySQL. Akun registrasi baru ber-role user dan tidak bisa memakai request ini. Gunakan adminToken dari request Login Admin; validasi input hanya dapat diuji setelah otorisasi admin berhasil."
       },
       "response": []
     },
@@ -166,7 +202,7 @@
           },
           {
             "key": "Authorization",
-            "value": "Bearer {{token}}"
+            "value": "Bearer {{adminToken}}"
           }
         ],
         "body": {
@@ -174,7 +210,7 @@
           "raw": "{\n  \"title\": \"  \",\n  \"author\": \"Penulis Uji\"\n}"
         },
         "url": "{{baseUrl}}/api/books",
-        "description": "Expected: 400."
+        "description": "Expected: 400. Gunakan adminToken dari request Login Admin; validasi input hanya dapat diuji setelah otorisasi admin berhasil."
       },
       "response": []
     },
@@ -189,7 +225,7 @@
           },
           {
             "key": "Authorization",
-            "value": "Bearer {{token}}"
+            "value": "Bearer {{adminToken}}"
           }
         ],
         "body": {
@@ -197,7 +233,7 @@
           "raw": "{\n  \"title\": \"Judul Uji\",\n  \"author\": \"  \"\n}"
         },
         "url": "{{baseUrl}}/api/books",
-        "description": "Expected: 400."
+        "description": "Expected: 400. Gunakan adminToken dari request Login Admin; validasi input hanya dapat diuji setelah otorisasi admin berhasil."
       },
       "response": []
     },
@@ -272,10 +308,6 @@
         "method": "POST",
         "header": [
           {
-            "key": "X-API-Key",
-            "value": "{{apiKey}}"
-          },
-          {
             "key": "Content-Type",
             "value": "application/json"
           },
@@ -311,14 +343,10 @@
       ]
     },
     {
-      "name": "3A. POST Loan - API Key Salah",
+      "name": "3A. POST Loan - Tanpa JWT",
       "request": {
         "method": "POST",
         "header": [
-          {
-            "key": "X-API-Key",
-            "value": "wrong-api-key"
-          },
           {
             "key": "Content-Type",
             "value": "application/json"
@@ -326,29 +354,33 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{availableBookId}}\n}"
+          "raw": "{\n  \"bookId\": {{availableBookId}}\n}"
         },
         "url": "{{baseUrl}}/api/loans",
-        "description": "Tanpa JWT yang valid, request tetap ditolak 401 karena endpoint peminjaman wajib JWT. API Key tidak menggantikan JWT; untuk menguji API Key gunakan GET Books dengan API Key salah."
+        "description": "API Key tidak menggantikan JWT. Tanpa Authorization: Bearer, Gateway harus mengembalikan 401."
       },
       "response": []
     },
     {
-      "name": "3B. POST Loan - API Key Tidak Dikirim",
+      "name": "3B. POST Loan - JWT Tidak Valid",
       "request": {
         "method": "POST",
         "header": [
           {
             "key": "Content-Type",
             "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer invalid.token.value"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"{{username}}\",\n  \"bookId\": {{availableBookId}}\n}"
+          "raw": "{\n  \"bookId\": {{availableBookId}}\n}"
         },
         "url": "{{baseUrl}}/api/loans",
-        "description": "Tanpa JWT yang valid, request ditolak 401 karena endpoint peminjaman wajib JWT. API Key bukan pengganti JWT."
+        "description": "JWT tidak valid harus menghasilkan 401 meskipun API Key tidak digunakan untuk endpoint transaksi."
       },
       "response": []
     },
@@ -357,10 +389,6 @@
       "request": {
         "method": "POST",
         "header": [
-          {
-            "key": "X-API-Key",
-            "value": "{{apiKey}}"
-          },
           {
             "key": "Content-Type",
             "value": "application/json"
@@ -385,10 +413,6 @@
         "method": "POST",
         "header": [
           {
-            "key": "X-API-Key",
-            "value": "{{apiKey}}"
-          },
-          {
             "key": "Content-Type",
             "value": "application/json"
           },
@@ -412,10 +436,6 @@
         "method": "POST",
         "header": [
           {
-            "key": "X-API-Key",
-            "value": "{{apiKey}}"
-          },
-          {
             "key": "Content-Type",
             "value": "application/json"
           },
@@ -438,10 +458,6 @@
       "request": {
         "method": "GET",
         "header": [
-          {
-            "key": "X-API-Key",
-            "value": "{{apiKey}}"
-          },
           {
             "key": "Authorization",
             "value": "Bearer {{token}}"
@@ -485,17 +501,12 @@
       "response": []
     },
     {
-      "name": "4A. GET Loans - API Key Salah",
+      "name": "4A. GET Loans - Tanpa JWT",
       "request": {
         "method": "GET",
-        "header": [
-          {
-            "key": "X-API-Key",
-            "value": "wrong-api-key"
-          }
-        ],
+        "header": [],
         "url": "{{baseUrl}}/api/loans/{{username}}",
-        "description": "Tanpa JWT valid, expected 401. API Key tidak dapat menggantikan JWT untuk riwayat peminjaman."
+        "description": "Riwayat transaksi selalu memerlukan JWT pemilik. API Key tidak menggantikan token pengguna; expected 401."
       },
       "response": []
     },
@@ -519,10 +530,6 @@
       "request": {
         "method": "GET",
         "header": [
-          {
-            "key": "X-API-Key",
-            "value": "{{apiKey}}"
-          },
           {
             "key": "Authorization",
             "value": "Bearer {{token}}"

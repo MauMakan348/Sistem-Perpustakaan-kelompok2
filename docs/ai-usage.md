@@ -65,3 +65,15 @@ Hasil ini tidak membuktikan seluruh fitur lulus pengujian runtime. Tes source-le
 ## 6. Prinsip penggunaan AI
 
 AI membantu mempercepat analisis dan penyusunan perubahan. Developer tetap bertanggung jawab memastikan hasil sesuai source code aktual, menjalankan tes yang tersedia, melaporkan tes yang gagal/terhambat, dan tidak mengklaim fitur sudah tervalidasi jika pengujian runtime belum dilakukan.
+
+## 7. Perubahan untuk satu perintah startup
+
+Untuk memenuhi kebutuhan menjalankan backend dari root dengan `npm start`, ditambahkan `scripts/start-all.js`. Runner menyalakan Book Service dan Loan Service sebagai child process, menunggu port tersedia, kemudian memulai API Gateway. Ini pendekatan process runner setara dengan script multi-service; kode tetap terpisah dan tidak menjadi monolith. Runner memberi prefix pada log, menghentikan proses yang telah dijalankan jika startup gagal, dan menangani Ctrl+C/SIGTERM.
+
+Environment utama dibaca dari `.env` root dan diwariskan ke child process. Karena semua proses mewarisi environment yang sama, konfigurasi database dipisah menjadi `BOOK_DB_NAME` dan `LOAN_DB_NAME`, dan port layanan menggunakan `GATEWAY_PORT`, `BOOK_PORT`, serta `LOAN_PORT`. File `.env.example` hanya berisi placeholder.
+
+## 8. Pemeriksaan tambahan
+
+Saat meninjau migration buku, ditemukan upsert data seed sebelumnya ikut memperbarui kolom status. Menjalankan migration kembali dapat mengembalikan status buku yang sedang dipinjam ke nilai awal dari JSON. Upsert diperbaiki agar pada ID yang sudah ada hanya memperbarui judul dan penulis, sementara status ketersediaan yang aktif dipertahankan. Satu tes source-level regresi ditambahkan untuk aturan tersebut.
+
+Pemeriksaan terbaru pada paket final: `npm run check` lulus; tes source-level Gateway dan regresi lulus 11/11. Instalasi dependency root dicoba tetapi timeout karena registry package tidak terjangkau pada lingkungan pembuatan, sehingga tes hashing/JWT yang memerlukan `bcryptjs` belum dapat dijalankan di lingkungan ini. MySQL end-to-end dan lifecycle runner dengan seluruh service hidup juga belum dijalankan; keduanya tetap perlu diverifikasi setelah `npm install` dan MySQL tersedia.

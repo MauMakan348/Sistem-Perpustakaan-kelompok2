@@ -120,15 +120,21 @@ Content-Type: application/json
 2. Loan Service mengunci baris transaksi dengan `SELECT ... FOR UPDATE`, memeriksa kepemilikan dan status `active`.
 3. Loan Service memeriksa buku lewat Book Service, mengubah status buku menjadi `tersedia`, kemudian menyimpan `status='returned'` dan `returned_at` dalam transaksi MySQL.
 4. Transaksi yang sudah dikembalikan tidak dapat dikembalikan lagi (`409`). Jika update transaksi gagal setelah status buku berubah, Loan Service mencoba kompensasi mengubah status buku kembali menjadi `dipinjam`.
-5. `GET /api/loans/:username` menampilkan pinjaman aktif milik pengguna yang tokennya digunakan; transaksi yang dikembalikan tetap tersimpan di database tetapi tidak ditampilkan sebagai pinjaman aktif.
+5. `GET /api/loans/:username` menampilkan riwayat transaksi milik pengguna yang tokennya digunakan, termasuk transaksi berstatus `active` dan `returned`.
 
 ## 8. Environment dan teknologi
 
-- `api-gateway/.env`: `PORT`, `BOOK_SERVICE_HOST`, `BOOK_SERVICE_PORT`, `LOAN_SERVICE_HOST`, `LOAN_SERVICE_PORT`, `API_KEY`, `JWT_SECRET`.
-- `book-service/.env`: `PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`.
-- `loan-service/.env`: `PORT`, `BOOK_SERVICE_HOST`, `BOOK_SERVICE_PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_EXPIRES_IN`.
+- Mode satu perintah membaca `.env` di root: `GATEWAY_PORT`, `BOOK_PORT`, `LOAN_PORT`, `BOOK_SERVICE_HOST`, `BOOK_SERVICE_PORT`, `LOAN_SERVICE_HOST`, `LOAN_SERVICE_PORT`, `API_KEY`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `BOOK_DB_NAME`, dan `LOAN_DB_NAME`.
+- `BOOK_DB_NAME` dan `LOAN_DB_NAME` dipakai untuk memastikan setiap service memakai database miliknya meskipun environment diwariskan dari satu root process.
+- File `.env.example` di dalam direktori service tetap tersedia untuk mode menjalankan service secara individual, tetapi petunjuk utama project menggunakan root `.env`.
 - Stack: Node.js native HTTP, MySQL, `mysql2`, `dotenv`, `bcryptjs`, `jsonwebtoken`, HTML/CSS/Vanilla JS, Postman.
 
 ## 9. Batasan verifikasi
 
 Source-level syntax check dan tes unit/static yang tersedia tidak membuktikan alur database end-to-end. Dalam hasil audit terakhir, tes source-level regresi dan tes keamanan Gateway lulus, sedangkan tes autentikasi Loan Service terhambat dependency `bcryptjs` yang tidak tersedia dan instalasi dependency timeout. Tes end-to-end dengan MySQL aktif belum dijalankan pada environment audit tersebut.
+
+## 10. Menjalankan seluruh backend dengan satu perintah
+
+Dari root project jalankan `npm install`, siapkan root `.env` dari `.env.example`, buat kedua database, lalu jalankan `npm run migrate` dan `npm start`. `scripts/start-all.js` menjalankan Book Service dan Loan Service sebagai child process terpisah, menunggu port mereka siap, baru memulai API Gateway. Ini menggunakan pendekatan process runner yang setara dengan menjalankan beberapa service melalui satu script; tidak menggabungkan source code menjadi monolith.
+
+Runner meneruskan log dengan label nama service, memeriksa kesiapan port, dan menghentikan semua child process jika startup gagal atau pengguna menekan Ctrl+C. Ketika port sudah dipakai proses lain, startup akan gagal dengan pesan yang menyebut service/port; hentikan proses lama atau ubah port pada root `.env`. Semua proses mewarisi environment root, dengan `BOOK_DB_NAME` dan `LOAN_DB_NAME` terpisah agar ownership database tetap benar.

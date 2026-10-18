@@ -1,0 +1,21 @@
+{
+  "name": "sistem-perpustakaan-microservices",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistem Perpustakaan dengan API Gateway, Book Service, Loan Service, dan MySQL",
+  "main": "api-gateway/server.js",
+  "scripts": {
+    "start": "node scripts/start-all.js",
+    "migrate": "npm run migrate:books && npm run migrate:loans",
+    "migrate:books": "node book-service/migrate.js",
+    "migrate:loans": "node loan-service/migrate.js",
+    "test": "node --test api-gateway/test/security-audit.test.js loan-service/test/auth.test.js loan-service/test/regression-audit.test.js",
+    "check": "node --check scripts/start-all.js && node --check api-gateway/server.js && node --check book-service/server.js && node --check loan-service/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.0"
+  }
+}

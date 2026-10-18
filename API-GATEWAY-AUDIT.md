@@ -1,6 +1,6 @@
 # API Gateway security audit
 
-Gateway publik tetap pada `PORT` (default `4000`). URL service internal dikonfigurasi dengan `BOOK_SERVICE_HOST`, `BOOK_SERVICE_PORT`, `LOAN_SERVICE_HOST`, dan `LOAN_SERVICE_PORT`. `API_KEY` adalah kredensial untuk klien tepercaya/operator dan `JWT_SECRET` dipakai Gateway untuk memverifikasi JWT; keduanya wajib di environment, bukan di frontend.
+Gateway publik menggunakan `GATEWAY_PORT` (default `4000`; `PORT` tetap didukung sebagai fallback saat service dijalankan individual). URL service internal dikonfigurasi dengan `BOOK_SERVICE_HOST`, `BOOK_SERVICE_PORT`, `LOAN_SERVICE_HOST`, dan `LOAN_SERVICE_PORT`. `API_KEY` adalah kredensial untuk klien tepercaya/operator dan `JWT_SECRET` dipakai Gateway untuk memverifikasi JWT; keduanya wajib di environment, bukan di frontend.
 
 | Method | Path publik | Service | API Key | JWT pengguna | Role |
 |---|---|---|---|---|---|

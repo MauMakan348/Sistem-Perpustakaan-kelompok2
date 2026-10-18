@@ -15,7 +15,7 @@ const {
   getAuthenticatedUser,
 } = require("./auth");
 
-const PORT = Number(process.env.PORT || 4002);
+const PORT = Number(process.env.LOAN_PORT || process.env.PORT || 4002);
 const BOOK_SERVICE_HOST = process.env.BOOK_SERVICE_HOST || "127.0.0.1";
 const BOOK_SERVICE_PORT = Number(process.env.BOOK_SERVICE_PORT || 4001);
 const JWT_SECRET = process.env.JWT_SECRET;
