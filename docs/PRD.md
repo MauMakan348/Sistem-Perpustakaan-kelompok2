@@ -70,7 +70,7 @@ Template UTS menyebut satu backend service utama cukup dan tidak mengharuskan ba
 | Format API | HTTP/JSON | Sesuai ketentuan UTS. |
 | Frontend | HTML5, CSS3, Vanilla JavaScript | Antarmuka yang sudah ada pada `frontend/`. |
 | Alat uji API | Postman Collection dan Postman Environment di `postman/` | Menguji endpoint serta menyimpan token/variabel pengujian. Eksekusi semua skenario belum dibuktikan. |
-| AI assistant | [PERLU DIKONFIRMASI: tuliskan nama AI Coding Tool yang digunakan anggota] | Membantu analisis, implementasi, debugging, dan dokumentasi; hasil harus direview manusia dan diuji. |
+| AI assistant | ChatGPT | Membantu analisis, implementasi, debugging, dan dokumentasi; hasil harus direview manusia dan diuji. |
 
 ## 7. Kebutuhan Fungsional
 
