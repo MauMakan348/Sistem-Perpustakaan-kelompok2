@@ -10,11 +10,7 @@
 | Nama proyek | Sistem Perpustakaan |
 | Mata kuliah | Vibe Coding |
 | Jenis tugas | UTS Kelompok |
-| Anggota (nama dan NIM) | Sri Maharani - 2441919028
-Shandy Aulia - 2441919027
-Putra Aji Pratama - 2441919011
-Muhammad Lutfi Rivani - 2441919037
-Lia Saripah - 2441919012 |
+| Anggota (nama dan NIM) | Sri Maharani - 2441919028 Shandy Aulia - 2441919027 Putra Aji Pratama - 2441919011 Muhammad Lutfi Rivani - 2441919037 Lia Saripah - 2441919012 |
 | Versi dan tanggal | Draf PRD 1.0 — 18 Oktober 2026 |
 | Link repository | https://github.com/MauMakan348/Sistem-Perpustakaan-kelompok2 |
 | Sumber audit | ZIP `Sistem-Perpustakaan-kelompok2-perbaikan-root.zip` dan PDF `Salinan UTS-VIBE_CODING (1).pdf` yang dilampirkan |
