@@ -2,15 +2,15 @@
   "name": "sistem-perpustakaan-microservices",
   "version": "1.0.0",
   "private": true,
-  "description": "Sistem Perpustakaan dengan API Gateway, Book Service, Loan Service, dan MySQL",
-  "main": "api-gateway/server.js",
+  "description": "Sistem Perpustakaan dengan satu backend API Node.js dan MySQL",
+  "main": "backend/server.js",
   "scripts": {
-    "start": "node scripts/start-all.js",
+    "start": "node backend/server.js",
     "migrate": "npm run migrate:books && npm run migrate:loans",
     "migrate:books": "node book-service/migrate.js",
     "migrate:loans": "node loan-service/migrate.js",
-    "test": "node --test api-gateway/test/security-audit.test.js loan-service/test/auth.test.js loan-service/test/regression-audit.test.js",
-    "check": "node --check scripts/start-all.js && node --check api-gateway/server.js && node --check book-service/server.js && node --check loan-service/server.js"
+    "test": "node --test backend/test/source-audit.test.js loan-service/test/auth.test.js loan-service/test/regression-audit.test.js",
+    "check": "node --check backend/server.js && node --check scripts/start-all.js && node --check api-gateway/server.js && node --check book-service/server.js && node --check loan-service/server.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
