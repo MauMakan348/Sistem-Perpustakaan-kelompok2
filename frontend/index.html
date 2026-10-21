@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="api-gateway-url" content="http://localhost:4000">
 <title>Sistem Peminjaman Buku Perpustakaan (Microservice)</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -47,8 +48,25 @@
     </header>
 
     <main>
+      <section class="panel hidden" id="adminBookPanel">
+        <h2>Tambah Buku (Admin)</h2>
+        <form id="addBookForm" class="inline-form">
+          <label for="newBookTitle">Judul</label>
+          <input id="newBookTitle" name="title" maxlength="500" required placeholder="Judul buku">
+          <label for="newBookAuthor">Penulis</label>
+          <input id="newBookAuthor" name="author" maxlength="255" required placeholder="Nama penulis">
+          <button type="submit">Tambah Buku</button>
+        </form>
+        <p id="addBookMessage" class="message" role="status" aria-live="polite"></p>
+        <p class="hint">Buku baru otomatis berstatus tersedia. Status tidak dapat ditentukan melalui formulir ini.</p>
+      </section>
+
       <section class="panel">
-        <h2>Daftar Buku</h2>
+        <div class="panel-heading">
+          <h2>Daftar Buku</h2>
+          <button type="button" id="btnRefresh" class="button-secondary">Muat Ulang</button>
+        </div>
+        <p id="booksMessage" class="message" role="status" aria-live="polite"></p>
         <table id="tabelBuku">
           <thead>
             <tr><th>Judul</th><th>Penulis</th><th>Status</th><th>Aksi</th></tr>
@@ -58,13 +76,19 @@
       </section>
 
       <section class="panel">
-        <h2>Buku Saya (<span id="jumlahPinjam">0</span>/3)</h2>
-        <table id="tabelPinjaman">
-          <thead>
-            <tr><th>Judul</th><th>Tanggal Pinjam</th><th>Jatuh Tempo</th></tr>
-          </thead>
-          <tbody id="bodyPinjaman"></tbody>
-        </table>
+        <div class="panel-heading">
+          <h2>Peminjaman Saya (<span id="jumlahPinjam">0</span>/3 aktif)</h2>
+          <button type="button" id="btnRefreshLoans" class="button-secondary">Muat Ulang</button>
+        </div>
+        <p id="loansMessage" class="message" role="status" aria-live="polite"></p>
+        <div class="table-wrap">
+          <table id="tabelPinjaman">
+            <thead>
+              <tr><th>Judul</th><th>Tanggal Pinjam</th><th>Jatuh Tempo</th><th>Status</th><th>Dikembalikan</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="bodyPinjaman"></tbody>
+          </table>
+        </div>
       </section>
     </main>
   </section>

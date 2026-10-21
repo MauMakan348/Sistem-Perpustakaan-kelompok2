@@ -1,125 +1,26 @@
 # Dokumentasi Penggunaan AI Coding Tool
 
-## 1. AI Coding Tool yang Digunakan
+## Ruang lingkup bantuan
 
-AI assistant yang digunakan selama proses pengembangan dan penyusunan project adalah **ChatGPT**.
+ChatGPT digunakan untuk membantu analisis requirement UTS, review source, penyesuaian implementasi, penyusunan tes source-level, Postman collection, serta sinkronisasi dokumentasi. Output AI diperlakukan sebagai usulan yang harus diverifikasi, bukan bukti bahwa aplikasi berjalan.
 
-AI digunakan sebagai alat bantu untuk analisis requirement, perancangan perubahan, penulisan kode, pemeriksaan struktur, debugging, pembuatan dokumentasi, dan penyusunan skenario testing. Kode tidak dianggap benar hanya karena dihasilkan oleh AI; hasilnya diperiksa terhadap requirement dan struktur project.
+## Kondisi arsitektur yang diaudit pada versi ini
 
-## 2. Bagian yang Dibantu AI
+Runtime yang aktif dalam paket ini adalah satu backend (`backend/server.js`) pada port `4000`, satu database MySQL (`DB_NAME`) dengan tabel `users`, `books`, dan `loans`, serta frontend statis yang disajikan backend. Folder `api-gateway/`, `book-service/`, `loan-service/`, dan `scripts/start-all.js` dipertahankan sebagai legacy/reference dan tidak dijalankan oleh `npm start`. Dokumentasi lama yang menggambarkan Gateway dan dua service terpisah adalah riwayat tahapan pengembangan, bukan arsitektur runtime paket ini.
 
-AI membantu pada beberapa tahap berikut:
+## Area yang dibantu AI
 
-1. **Analisis Acceptance Criteria**
-   - Menganalisis masalah pada aturan maksimal 3 peminjaman aktif.
-   - Menjelaskan lokasi logika yang menentukan status tombol peminjaman.
+- Penyesuaian autentikasi username/password dengan bcrypt dan JWT.
+- Validasi input, aturan tiga pinjaman aktif, deadline tujuh hari, status buku, ownership transaksi, dan rollback.
+- Konsolidasi database MySQL dan migrator non-destruktif.
+- Pemeriksaan route aktif dan penyelarasan API Contract, Postman, README, audit, dan changelog.
 
-2. **Perancangan microservice**
-   - Memisahkan tanggung jawab Book Service dan Loan Service.
-   - Menentukan kebutuhan komunikasi Loan Service -> Book Service melalui API.
-   - Merancang API Gateway sebagai entry point client.
+## Batas verifikasi
 
-3. **Migrasi persistence**
-   - Menganalisis struktur `books.json` dan `loans.json`.
-   - Menyusun schema MySQL.
-   - Menambahkan koneksi `mysql2`, konfigurasi `dotenv`, dan script migration.
-   - Mempertahankan JSON sebagai sumber data migrasi dan tidak menghapus data lama.
+Tes otomatis yang dijalankan pada Prompt 4 adalah tes source/kontrak. Hasil `npm test` 24/24, `npm run check`, dan `node --check frontend/script.js` lulus. Namun dependency runtime `mysql2`, `bcryptjs`, `jsonwebtoken`, dan `dotenv` tidak tersedia di environment audit, `.env` tidak ada, dan klien MySQL tidak tersedia. Oleh karena itu, `npm start`, migrasi MySQL, request HTTP, Postman, transaksi database aktual, dan uji konkurensi berstatus `NOT TESTED`.
 
-4. **API Gateway**
-   - Menambahkan Gateway port `4000` menggunakan Node.js native HTTP.
-   - Menambahkan routing public `/api/books`, `/api/loans`, dan `/api/login`.
-   - Menambahkan forwarding request/response dan error `502` untuk service internal yang tidak tersedia.
+Tidak ada screenshot Postman atau respons runtime yang dibuat-buat. `api-test/RESULTS.md` memisahkan ekspektasi dari hasil aktual.
 
-5. **API Key authentication**
-   - Menambahkan validasi `X-API-Key` di Gateway.
-   - Memindahkan API key ke environment variable.
-   - Memastikan frontend tidak menyimpan API key rahasia.
+## Review manusia
 
-6. **End-to-end loan flow**
-   - Memastikan Loan Service meminta data buku melalui Book Service API.
-   - Memastikan Loan Service menyimpan transaksi di Loan Database sendiri.
-   - Memastikan perubahan status buku dilakukan melalui Book Service.
-   - Menambahkan rollback jika update status buku gagal setelah loan dibuat.
-
-7. **Postman testing**
-   - Menyusun skenario testing untuk endpoint yang memang tersedia.
-   - Membuat Postman Collection JSON yang menggunakan variable `baseUrl` dan `apiKey`.
-
-8. **Dokumentasi**
-   - Membantu memperbarui README, arsitektur, dokumentasi penggunaan AI, prompt, E2E flow, dan Postman testing berdasarkan implementasi akhir.
-
-## 3. Bagian yang Diperiksa Manusia
-
-Pemeriksaan manusia tetap diperlukan untuk:
-
-- memastikan requirement tugas tidak berubah;
-- memastikan pembagian tanggung jawab service sesuai tugas;
-- memastikan tidak ada akses langsung Loan Service ke Book Database;
-- memastikan frontend tidak menggunakan port `4001` atau `4002`;
-- memastikan API Key tidak ditulis di source code atau frontend;
-- memeriksa struktur database dan environment variable;
-- memeriksa response/error yang diharapkan;
-- menentukan apakah perubahan AI benar-benar diperlukan dan tidak menambah fitur di luar requirement.
-
-## 4. Masalah/Kesalahan atau Ketidaksesuaian yang Ditemukan
-
-### Dokumentasi lama tidak sesuai implementasi terbaru
-
-Dokumentasi project sebelumnya masih menyebut:
-
-- JSON sebagai persistence utama;
-- frontend mengakses service internal secara langsung; dan
-- AI Coding Tool yang digunakan adalah Claude.
-
-Dokumentasi tersebut kemudian diperbarui agar sesuai dengan implementasi yang benar-benar digunakan pada tahap akhir project ini.
-
-### API key pada frontend
-
-Pada tahap implementasi API Gateway, ditemukan bahwa frontend sempat memiliki API key secara hardcoded. Hal ini tidak sesuai dengan requirement bahwa secret API key tidak diletakkan pada frontend public.
-
-Perbaikannya adalah menghapus API key dari frontend. Authentication API Gateway kemudian diuji melalui Postman.
-
-### Persistence
-
-Implementasi awal project menggunakan file JSON. Requirement terbaru meminta database persistence, sehingga Book Service dan Loan Service kemudian menggunakan MySQL dengan database ownership terpisah.
-
-## 5. Perbaikan yang Dilakukan
-
-Perbaikan utama yang diterapkan:
-
-- JSON persistence diganti menjadi MySQL sebagai persistence aktif.
-- Migration script dibuat untuk memindahkan data JSON lama ke MySQL tanpa menghapus file JSON sumber.
-- Book Service dan Loan Service tetap terpisah.
-- Loan Service berkomunikasi dengan Book Service melalui HTTP API.
-- API Gateway ditambahkan pada port `4000`.
-- API Key authentication ditambahkan pada Gateway.
-- API Key dipindahkan ke `.env` dan `.env` dimasukkan ke `.gitignore`.
-- Frontend diarahkan hanya ke Gateway.
-- API Key dihapus dari frontend public.
-- Error handling ditambahkan untuk service internal dan request/database error.
-- Rollback loan ditambahkan jika update status buku gagal.
-- Postman Collection dan dokumentasi testing dibuat menggunakan endpoint existing.
-
-## 6. Testing yang Dilakukan
-
-Pemeriksaan yang dilakukan selama pengembangan meliputi:
-
-- syntax check pada source Node.js utama;
-- pemeriksaan route public dan route internal;
-- pemeriksaan bahwa frontend hanya menggunakan `http://localhost:4000`;
-- pemeriksaan bahwa Loan Service tidak mengimpor atau menggunakan koneksi Book Database;
-- validasi struktur Postman Collection sebagai JSON;
-- pengujian perilaku API Key pada Gateway untuk key benar, salah, dan tidak dikirim;
-- pengujian routing/forwarding menggunakan service lokal sementara pada tahap verifikasi Gateway;
-- review alur E2E peminjaman dan rollback berdasarkan kode.
-
-Pengujian database MySQL penuh tidak dijalankan pada environment pengembangan ini ketika MySQL server/kredensial yang diperlukan tidak tersedia. Oleh karena itu dokumentasi tidak mengklaim hasil transaksi MySQL nyata dari environment tersebut.
-
-## 7. Prinsip Penggunaan AI
-
-AI digunakan sebagai alat bantu pengembangan, bukan sebagai pengganti pemeriksaan developer. Setiap perubahan dibandingkan dengan requirement dan diperiksa kembali sebelum dimasukkan ke versi project berikutnya.
-
-
-## Perubahan database PostgreSQL ke MySQL
-
-Pada tahap berikutnya, requirement berubah dari PostgreSQL menjadi MySQL. Dengan bantuan ChatGPT, implementasi koneksi, query, schema, migration, konfigurasi environment, dan dependency disesuaikan ke `mysql2`. Manusia tetap perlu menjalankan dan memeriksa migration serta alur API pada mesin yang memiliki MySQL aktif. Riwayat prompt PostgreSQL pada `prompts.md` dipertahankan sebagai catatan proses sebelumnya, bukan sebagai konfigurasi project saat ini.
+Anggota kelompok tetap harus menjalankan instalasi dan pengujian pada mesin mereka, memeriksa query database, mengaudit secret sebelum commit, serta mengisi nama/tanggal reviewer hanya setelah review manusia sungguh dilakukan. Jangan mengisi identitas atau keputusan review atas nama AI.

@@ -11,6 +11,22 @@ async function migrate() {
 
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   const statements = schema.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
+  const [loansTableRows] = await pool.query(
+    `SELECT COUNT(*) AS tableCount FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name = 'loans'`
+  );
+  const loansTableExists = Number(loansTableRows[0].tableCount) > 0;
+  if (loansTableExists) {
+    const [loanColumns] = await pool.query("SHOW COLUMNS FROM loans");
+    const existing = new Set(loanColumns.map(column => column.Field));
+    if (!existing.has("status")) {
+      await pool.query("ALTER TABLE loans ADD COLUMN status ENUM('active', 'returned') NOT NULL DEFAULT 'active'");
+    }
+    if (!existing.has("returned_at")) {
+      await pool.query("ALTER TABLE loans ADD COLUMN returned_at DATETIME(3) NULL");
+    }
+    // Data historis tetap dipertahankan; transaksi lama dianggap aktif sampai dikembalikan melalui API.
+  }
   const [userTableRows] = await pool.query(
     `SELECT COUNT(*) AS tableCount
      FROM information_schema.tables
@@ -26,6 +42,10 @@ async function migrate() {
       const missingColumns = requiredColumns.filter(column => !existingColumnNames.has(column));
       if (missingColumns.length > 0) {
         throw new Error(`Tabel users sudah ada tetapi tidak kompatibel. Kolom yang belum ada: ${missingColumns.join(", ")}. Tidak ada tabel/data yang dihapus.`);
+      }
+      // Role ditambahkan secara non-destruktif. Akun lama tetap user; admin ditetapkan manual oleh operator.
+      if (!existingColumnNames.has("role")) {
+        await pool.query("ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') NOT NULL DEFAULT 'user'");
       }
       const [indexes] = await pool.query("SHOW INDEX FROM users");
       const uniqueIndexes = indexes.filter(index => Number(index.Non_unique) === 0);
@@ -44,14 +64,8 @@ async function migrate() {
 
   for (const loan of loans) {
     await pool.query(
-      `INSERT INTO loans (id, username, book_id, book_title, borrow_date, due_date)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         username = VALUES(username),
-         book_id = VALUES(book_id),
-         book_title = VALUES(book_title),
-         borrow_date = VALUES(borrow_date),
-         due_date = VALUES(due_date)`,
+      `INSERT IGNORE INTO loans (id, username, book_id, book_title, borrow_date, due_date)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         loan.id,
         loan.username,

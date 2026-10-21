@@ -17,7 +17,7 @@ function createAccessToken(user) {
   if (!secret) throw new Error("JWT_SECRET belum dikonfigurasi.");
 
   return jwt.sign(
-    { username: user.username },
+    { username: user.username, role: user.role || "user" },
     secret,
     {
       subject: String(user.id),
@@ -41,7 +41,7 @@ function getAuthenticatedUser(req) {
   try {
     const payload = verifyAccessToken(match[1]);
     if (!payload.sub || !payload.username) return null;
-    return { id: String(payload.sub), username: payload.username };
+    return { id: String(payload.sub), username: payload.username, role: payload.role || "user" };
   } catch {
     return null;
   }

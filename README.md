@@ -1,574 +1,118 @@
-# Sistem Peminjaman Buku Perpustakaan — Microservice
+# Sistem Peminjaman Buku Perpustakaan — UTS Vibe Coding
 
-## 1. Nama Project
+## Deskripsi dan teknologi
 
-**Sistem Peminjaman Buku Perpustakaan — Microservice**
+Aplikasi web sederhana untuk registrasi/login, katalog buku, peminjaman, riwayat transaksi, dan pengembalian. Jalur runtime pada paket ini adalah **satu backend Node.js** (`backend/server.js`) dengan HTTP API, frontend statis (`frontend/`), serta satu database MySQL berisi tabel `users`, `books`, dan `loans`. Folder `api-gateway/`, `book-service/`, dan `loan-service/` adalah implementasi/artefak legacy yang dipertahankan; `npm start` tidak menjalankannya.
 
-Project ini merupakan pengembangan dari project Sistem Perpustakaan sebelumnya menjadi aplikasi berbasis microservice.
+Teknologi utama: Node.js, HTTP server bawaan Node, MySQL, `mysql2`, `bcryptjs`, `jsonwebtoken`, `dotenv`, HTML, CSS, JavaScript, dan Postman.
 
-## 2. Deskripsi
+## Persyaratan
 
-Sistem digunakan untuk melihat daftar buku, melihat status ketersediaan buku, login mahasiswa, melihat peminjaman aktif, dan melakukan peminjaman buku.
+- Node.js yang mendukung sintaks yang digunakan (disarankan Node.js LTS modern).
+- npm.
+- MySQL aktif dan akun database yang boleh membuat database/tabel serta membaca database lama bila migrasi legacy diperlukan.
+- Postman (opsional, untuk pengujian API manual).
 
-Versi saat ini menggunakan dua microservice utama, yaitu **Book Service** dan **Loan Service**, serta **API Gateway** sebagai satu-satunya entry point untuk client. Data utama masing-masing service disimpan pada database MySQL yang terpisah.
+## Instalasi dan konfigurasi environment
 
-## 3. Tujuan Project
-
-Tujuan pengembangan adalah menerapkan konsep microservice pada project Sistem Perpustakaan yang sudah ada, dengan:
-
-- pemisahan tanggung jawab antar-service;
-- API Gateway sebagai entry point client;
-- komunikasi antar-service melalui HTTP API;
-- database terpisah berdasarkan ownership service;
-- API Key authentication pada Gateway; dan
-- pengujian API menggunakan Postman.
-
-## 4. Architecture Sebelum
-
-Versi sebelumnya merupakan aplikasi web sederhana dengan frontend HTML/CSS/JavaScript dan persistence menggunakan file/localStorage pada tahap awal project. Pada tahap microservice awal, Book Service dan Loan Service sudah dipisahkan, tetapi client masih dapat berkomunikasi langsung dengan service internal.
-
-Secara sederhana:
-
-```text
-Client / Frontend
-      |             \
-      v              v
-Book Service      Loan Service
-  :4001              :4002
-      |                |
-  books data       loans data
-```
-
-## 5. Architecture Sesudah
-
-Arsitektur yang sudah diimplementasikan:
-
-```text
-                         Client
-                  Web / Postman / Client
-                            |
-                     X-API-Key + HTTP
-                            |
-                            v
-                   API Gateway :4000
-                     /             \
-                    /               \
-                   v                 v
-          Book Service :4001   Loan Service :4002
-                   |                 |
-                   v                 |
-          Book MySQL (`book_db`)            |
-                                     v
-                              Loan MySQL (`loan_db`)
-
-Loan Service <---- HTTP API ----> Book Service
-```
-
-Client menggunakan Gateway `:4000`. Port `:4001` dan `:4002` merupakan port service internal.
-
-## 6. Daftar Microservice
-
-| Komponen | Port | Tanggung jawab |
-|---|---:|---|
-| API Gateway | 4000 | Entry point client, API Key authentication, routing dan forwarding |
-| Book Service | 4001 | Data buku dan status ketersediaan buku |
-| Loan Service | 4002 | Registrasi/login pengguna, JWT, transaksi peminjaman, batas 3 buku aktif dan jatuh tempo 7 hari |
-
-## 7. Fungsi Setiap Service
-
-### API Gateway
-
-- Menerima request client.
-- Memeriksa header `X-API-Key`.
-- Meneruskan request ke service tujuan.
-- Meneruskan method, path, body, header yang relevan, status response, dan body response.
-- Mengembalikan `502` jika service internal tidak tersedia.
-- Tidak menjalankan business logic buku atau peminjaman.
-
-### Book Service
-
-- Mengambil daftar buku.
-- Mengambil detail buku.
-- Mengubah status buku menjadi `tersedia` atau `dipinjam`.
-- Mengakses Book MySQL (`book_db`).
-
-### Loan Service
-
-- Registrasi akun dengan password hash dan login menggunakan username/password; login menghasilkan JWT Bearer dengan masa berlaku.
-- Mengambil daftar peminjaman aktif mahasiswa.
-- Memvalidasi transaksi peminjaman.
-- Membatasi maksimal 3 peminjaman aktif.
-- Menetapkan masa pinjam 7 hari.
-- Memanggil Book Service melalui HTTP API untuk mengecek dan mengubah status buku.
-- Mengakses Loan MySQL (`loan_db`).
-
-## 8. API Gateway
-
-Gateway berjalan pada:
-
-```text
-http://localhost:4000
-```
-
-Endpoint publik yang tersedia:
-
-| Method | Endpoint | Tujuan |
-|---|---|---|
-| GET | `/api/books` | Daftar buku |
-| GET | `/api/books/:id` | Detail buku |
-| PATCH | `/api/books/:id/status` | Mengubah status buku |
-| POST | `/api/register` | Registrasi pengguna |
-| POST | `/api/login` | Login pengguna dan memperoleh JWT |
-| GET | `/api/loans/:username` | Peminjaman aktif |
-| POST | `/api/loans` | Membuat peminjaman |
-
-Gateway meneruskan route ke endpoint internal yang sesuai. Client tidak perlu memanggil `:4001` atau `:4002` secara langsung. Book Service dan Loan Service listen pada loopback `127.0.0.1` untuk konfigurasi lokal.
-
-## 9. Database
-
-Terdapat dua database MySQL dengan ownership terpisah:
-
-```text
-Book Service  -> book_db -> books
-Loan Service  -> loan_db -> loans
-```
-
-Loan Service **tidak mengakses Book Database secara langsung**. Informasi buku diperoleh melalui API Book Service.
-
-File terkait database:
-
-```text
-book-service/db.js
-book-service/schema.sql
-book-service/migrate.js
-loan-service/db.js
-loan-service/schema.sql
-loan-service/migrate.js
-```
-
-File `books.json` dan `loans.json` tetap berada di project sebagai data sumber migrasi lama. Script migration melakukan upsert ke MySQL dan tidak menghapus file JSON.
-
-## 10. API Key
-
-Gateway menggunakan header:
-
-```text
-X-API-Key: <API_KEY>
-```
-
-API Key disimpan pada environment variable `API_KEY`, bukan di source code.
-
-Contoh konfigurasi:
-
-```env
-API_KEY=your_api_key_here
-```
-
-Jika key tidak ada atau salah, Gateway mengembalikan:
-
-```http
-401 Unauthorized
-```
-
-API Key tidak disimpan di frontend public. Pengujian API dengan key dilakukan melalui Postman.
-
-## Autentikasi Pengguna
-
-- `POST /api/register` menerima `username` dan `password`; username unik dan password disimpan sebagai bcrypt hash di tabel `users` milik `loan_db`.
-- `POST /api/login` memeriksa kredensial dan mengembalikan JWT Bearer dengan masa berlaku. Password hash tidak dikirim dalam response.
-- Endpoint transaksi Loan Service memvalidasi JWT dan mengikat username transaksi dengan identitas di token.
-- API Key `X-API-Key` tetap menjadi mekanisme akses Gateway untuk client tepercaya seperti Postman. API Key bukan identitas pengguna dan tidak menggantikan JWT.
-- Registrasi/login tidak meminta API Key supaya browser dapat memulai sesi tanpa menyimpan secret Gateway. Route lain dapat diakses menggunakan API Key yang benar atau JWT valid; endpoint peminjaman tetap membutuhkan JWT valid di Loan Service.
-- JWT disimpan sementara pada `sessionStorage` browser, bukan sebagai database pengguna. `JWT_SECRET` harus sama pada konfigurasi lokal API Gateway dan Loan Service dan tidak boleh ditaruh di frontend/Git.
-
-## 11. Technology Stack
-
-| Bagian | Teknologi |
-|---|---|
-| Backend | Node.js native HTTP |
-| Gateway | Node.js native HTTP |
-| Database | MySQL |
-| Database driver | `mysql2` |
-| Password hashing | `bcryptjs` |
-| User token | `jsonwebtoken` (JWT) |
-| Environment configuration | `dotenv` |
-| Frontend | HTML5, CSS3, Vanilla JavaScript |
-| API testing | Postman |
-| AI Coding Assistant | ChatGPT |
-
-Project sengaja tidak menggunakan Express atau framework backend tambahan.
-
-## 12. Struktur Folder
-
-```text
-perpustakaan2/
-├── api-gateway/
-│   ├── server.js
-│   ├── package.json
-│   ├── .env.example
-│   ├── .gitignore
-│   └── README.md
-├── book-service/
-│   ├── server.js
-│   ├── db.js
-│   ├── migrate.js
-│   ├── schema.sql
-│   ├── books.json
-│   ├── package.json
-│   ├── .env.example
-│   └── .gitignore
-├── loan-service/
-│   ├── server.js
-│   ├── db.js
-│   ├── migrate.js
-│   ├── schema.sql
-│   ├── loans.json
-│   ├── package.json
-│   ├── .env.example
-│   └── .gitignore
-├── frontend/
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-├── docs/
-│   ├── architecture.md
-│   ├── ai-usage.md
-│   ├── prompts.md
-│   ├── e2e-loan-flow.md
-│   └── postman-testing.md
-├── postman/
-│   └── Sistem-Perpustakaan.postman_collection.json
-├── .gitignore
-└── README.md
-```
-
-## 13. Cara Install
-
-Pastikan sudah tersedia:
-
-- Node.js
-- MySQL
-- npm
-
-Install dependency setiap service:
+Dari direktori root repository:
 
 ```bash
-cd book-service
-npm install
+npm ci
+cp .env.example .env
 ```
 
-```bash
-cd ../loan-service
-npm install
-```
+Edit `.env` secara lokal; jangan commit atau membagikannya. Contoh variabel yang perlu disesuaikan:
 
-```bash
-cd ../api-gateway
-npm install
-```
-
-Dependency utama:
-
-- `mysql2` untuk koneksi MySQL pada Book Service dan Loan Service.
-- `dotenv` untuk membaca environment variable.
-- `bcryptjs` untuk hashing password pengguna.
-- `jsonwebtoken` untuk membuat dan memverifikasi JWT.
-
-## 14. Cara Konfigurasi `.env`
-
-Jangan menggunakan file `.env` yang dibagikan ke repository. Salin masing-masing `.env.example` menjadi `.env`.
-
-### Book Service
-
-```env
-PORT=4001
-DB_HOST=localhost
+```dotenv
+PORT=4000
+DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_NAME=book_db
 DB_USER=root
-DB_PASSWORD=your_mysql_password
-```
-
-### Loan Service
-
-```env
-PORT=4002
-BOOK_SERVICE_HOST=127.0.0.1
-BOOK_SERVICE_PORT=4001
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=loan_db
-DB_USER=root
-DB_PASSWORD=your_mysql_password
-JWT_SECRET=replace_with_a_long_random_secret_at_least_32_bytes
+DB_PASSWORD=
+DB_NAME=perpustakaan_db
+LEGACY_BOOK_DB_NAME=book_db
+LEGACY_LOAN_DB_NAME=loan_db
+API_KEY=ganti-dengan-api-key-random
+JWT_SECRET=ganti-dengan-secret-random-minimal-32-byte
 JWT_EXPIRES_IN=2h
 ```
 
-### API Gateway
+Isi `DB_PASSWORD` dengan password MySQL lokal yang benar. `JWT_SECRET` harus minimal 32 byte. `API_KEY` harus berupa nilai acak lokal. `LEGACY_BOOK_DB_NAME` dan `LEGACY_LOAN_DB_NAME` hanya digunakan oleh migrator; backend runtime menggunakan `DB_NAME`.
 
-```env
-PORT=4000
-BOOK_SERVICE_HOST=127.0.0.1
-BOOK_SERVICE_PORT=4001
-LOAN_SERVICE_HOST=127.0.0.1
-LOAN_SERVICE_PORT=4002
-API_KEY=your_api_key_here
-JWT_SECRET=replace_with_the_same_long_random_secret_as_loan_service
-```
+## Menyiapkan database
 
-File `.env` sudah dimasukkan ke `.gitignore`.
-
-## 15. Cara Menjalankan Database
-
-Buat dua database MySQL:
-
-```sql
-CREATE DATABASE book_db CHARACTER SET utf8mb4;
-CREATE DATABASE loan_db CHARACTER SET utf8mb4;
-```
-
-Kemudian jalankan migration dari masing-masing service:
+Pastikan MySQL server berjalan, lalu dari root proyek jalankan:
 
 ```bash
-cd book-service
 npm run migrate
 ```
 
-```bash
-cd loan-service
-npm run migrate
-```
+Migrator membuat schema `users`, `books`, `loans` pada `DB_NAME`. Jika database legacy tersedia, migrator mencoba menyalin data dari database sumber yang dikonfigurasi; database sumber tidak dihapus atau diubah. `INSERT IGNORE` dapat melewati konflik ID/username, jadi periksa log dan rekonsiliasi jumlah baris. Buat backup sebelum migrasi database yang berisi data penting. Jangan jalankan migrasi pertama kali pada database produksi tanpa rencana pemulihan.
 
-Migration membaca data lama dari `books.json` dan `loans.json`, membuat tabel yang diperlukan, lalu melakukan upsert ke MySQL.
+Akun baru dibuat melalui `POST /api/register`; tidak ada akun/password admin bawaan. Endpoint tambah buku `POST /api/books` hanya menerima token akun dengan role `admin`, sementara registrasi normal membuat role `user`. Jangan mengubah role atau data produksi hanya untuk membuat tes lulus; gunakan database lokal terpisah.
 
-## 16. Cara Menjalankan Setiap Service
+## Menjalankan aplikasi
 
-### Book Service
+Satu perintah untuk backend utama:
 
 ```bash
-cd book-service
 npm start
 ```
 
-Port:
+Backend menguji koneksi MySQL saat startup dan gagal memulai jika database tidak dapat diakses atau `JWT_SECRET` tidak valid. Setelah berjalan:
 
-```text
-http://localhost:4001
-```
+- Frontend: <http://localhost:4000/>
+- Health check: <http://localhost:4000/health>
+- Base URL API: `http://localhost:4000`
 
-### Loan Service
+Frontend disajikan oleh backend utama dan memanggil API dengan path same-origin.
 
-Pastikan Book Service dan MySQL tersedia terlebih dahulu.
+## API utama
 
-```bash
-cd loan-service
-npm start
-```
-
-Port:
-
-```text
-http://localhost:4002
-```
-
-## 17. Cara Menjalankan API Gateway
-
-Pastikan Book Service dan Loan Service sudah berjalan.
-
-```bash
-cd api-gateway
-npm start
-```
-
-Gateway:
-
-```text
-http://localhost:4000
-```
-
-## 18. Cara Menjalankan Frontend
-
-Frontend berada di folder `frontend` dan menggunakan Gateway:
-
-```text
-http://localhost:4000
-```
-
-`frontend/script.js` tidak memanggil port `4001` atau `4002` secara langsung.
-
-Frontend dapat dibuka menggunakan web server lokal sederhana atau Live Server di VS Code.
-
-## 19. Cara Menggunakan API melalui Postman
-
-Import collection:
-
-```text
-postman/Sistem-Perpustakaan.postman_collection.json
-```
-
-Atur variable:
-
-```text
-baseUrl = http://localhost:4000
-apiKey = API_KEY dari api-gateway/.env
-```
-
-Untuk request yang membutuhkan authentication, gunakan:
-
-```text
-X-API-Key: {{apiKey}}
-```
-
-Collection berisi request untuk:
-
+- `POST /api/register`
+- `POST /api/login`
 - `GET /api/books`
 - `GET /api/books/:id`
+- `POST /api/books` (JWT role admin)
+- `PATCH /api/books/:id/status` (API Key internal)
 - `POST /api/loans`
-- `GET /api/loans/:username`
+- `GET /api/loans/:username` (hanya pemilik JWT)
+- `POST /api/loans/:id/return` (hanya pemilik transaksi)
 
-Skenario error juga didokumentasikan di `docs/postman-testing.md`.
+Untuk detail header, request, response, validasi, dan status HTTP, baca [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md). Identitas peminjam diambil dari JWT; `username` dari body bukan bukti otorisasi. Batas aktif adalah tiga peminjaman, status buku harus `tersedia`, dan jatuh tempo dihitung tujuh kali 24 jam dari tanggal pinjam.
 
-## 20. Contoh API Request
+## Postman
 
-### Melihat daftar buku
+1. Jalankan MySQL, migrasi, dan backend.
+2. Import `api-test/collection.json` dan `api-test/environment.json` ke Postman.
+3. Pilih environment `Sistem Perpustakaan - Local Test (safe template)`.
+4. Isi variabel lokal `apiKey`, `password`, `wrongPassword`, `otherUsername`, dan ID data uji yang diperlukan. Jangan simpan secret asli dalam file yang dikomit.
+5. Jalankan health, register, login, daftar/detail buku, pinjam, status setelah pinjam, return, dan status setelah return sesuai prasyarat pada `api-test/README.md`.
+6. Skenario batas tiga pinjaman membutuhkan akun yang memiliki tepat tiga pinjaman aktif dan buku keempat tersedia. Skenario buku tidak tersedia memerlukan ID buku berstatus `dipinjam`. Skenario lain yang memerlukan ID tak ditemukan perlu memakai ID positif yang benar-benar tidak ada.
+7. Catat hasil aktual di `api-test/RESULTS.md`. Jangan tandai PASS sebelum request benar-benar dijalankan dan response serta perubahan database diperiksa. Screenshot contoh belum disediakan karena belum ada eksekusi Postman yang dapat dibuktikan pada environment penyusunan paket.
 
-```http
-GET http://localhost:4000/api/books
-X-API-Key: <API_KEY>
+## Pengujian otomatis
+
+```bash
+npm run check
+npm test
+node --check frontend/script.js
 ```
 
-### Meminjam buku
+Tes saat ini memeriksa source/kontrak dan tidak menjalankan server HTTP atau MySQL. Tes integrasi harus dilakukan pada lingkungan dengan dependency dan database aktif. `npm test` yang lulus tidak boleh dilaporkan sebagai bukti bahwa seluruh endpoint lulus runtime.
 
-```http
-POST http://localhost:4000/api/loans
-X-API-Key: <API_KEY>
-Content-Type: application/json
-```
+## Status verifikasi paket ini
 
-```json
-{
-  "username": "kokop",
-  "bookId": 2
-}
-```
+Pada audit dokumen ini, `npm test` lulus **24/24 source-level tests**; `npm run check` dan `node --check frontend/script.js` juga lulus. Dependency runtime (`mysql2`, `bcryptjs`, `jsonwebtoken`, `dotenv`) tidak tersedia pada environment audit, `mysql` CLI tidak tersedia, dan `.env` lokal tidak ada. Karena itu migrasi MySQL, `npm start`, request HTTP, Postman, perubahan database, dan concurrency runtime berstatus **NOT TESTED**. Rincian ada di [`docs/FINAL-UTS-AUDIT.md`](docs/FINAL-UTS-AUDIT.md) dan [`api-test/RESULTS.md`](api-test/RESULTS.md).
 
-## 21. Contoh API Response
+## Dokumentasi utama
 
-Contoh daftar buku:
-
-```json
-[
-  {
-    "id": 2,
-    "title": "Bumbu Kacang Asli dari Kebumen",
-    "author": "Mas Narji",
-    "status": "tersedia"
-  }
-]
-```
-
-Contoh peminjaman berhasil:
-
-```json
-{
-  "message": "Buku berhasil dipinjam.",
-  "loan": {
-    "id": 1790211757128,
-    "username": "kokop",
-    "bookId": 2,
-    "bookTitle": "Bumbu Kacang Asli dari Kebumen",
-    "borrowDate": "2026-10-01T06:30:00.000Z",
-    "dueDate": "2026-10-08T06:30:00.000Z"
-  }
-}
-```
-
-Nilai ID dan tanggal pada response nyata dibuat saat request berlangsung.
-
-## 22. Alur Peminjaman Buku
-
-```text
-Client / Postman
-      |
-      | POST /api/loans + X-API-Key
-      v
-API Gateway :4000
-      |
-      | POST /loans
-      v
-Loan Service :4002
-      |
-      | GET /books/:id
-      v
-Book Service :4001
-      |
-      v
-Book MySQL (`book_db`)
-      |
-      | data + status buku
-      v
-Loan Service
-      |
-      | INSERT loan
-      v
-Loan MySQL (`loan_db`)
-      |
-      | PATCH /books/:id/status
-      v
-Book Service -> Book MySQL (`book_db`)
-      |
-      v
-Loan Service -> API Gateway -> Client
-```
-
-Jika update status buku gagal setelah loan tersimpan, Loan Service menghapus kembali transaksi loan tersebut sebagai rollback.
-
-## 23. Cara Testing
-
-Testing API dilakukan menggunakan Postman Collection:
-
-```text
-postman/Sistem-Perpustakaan.postman_collection.json
-```
-
-Skenario yang didokumentasikan meliputi:
-
-- API Key benar;
-- API Key salah;
-- API Key tidak dikirim;
-- buku ditemukan;
-- buku tidak ditemukan;
-- buku tersedia;
-- buku sedang dipinjam;
-- data peminjaman tidak lengkap;
-- Book Service tidak tersedia;
-- Loan Service tidak tersedia; dan
-- database error jika kondisi database dapat disimulasikan.
-
-Detail expected status dan response terdapat pada `docs/postman-testing.md`.
-
-Selain itu, syntax source utama telah diperiksa selama pengembangan. Pengujian MySQL penuh harus dilakukan pada environment yang memiliki MySQL aktif dan kredensial yang sesuai.
-
-## 24. Kontribusi Anggota Kelompok
-
-Anggota kelompok yang tercantum pada project:
-
-| Anggota | Kontribusi |
-|---|---|
-| Shandy Aulia | Pengembangan project kelompok |
-| Sri Maharani | Pengembangan project kelompok |
-| Putra Aji Pratama | Pengembangan project kelompok |
-| Muhammad Lutfi Rivani | Pengembangan project kelompok |
-| Lia Saripah | Pengembangan project kelompok |
-
-Pembagian tugas individual yang lebih rinci tidak tercatat di source project yang digunakan untuk dokumentasi ini, sehingga dokumentasi tidak mengklaim pembagian tugas spesifik yang tidak dapat diverifikasi.
-
----
-
-## Dokumentasi Tambahan
-
-- [Architecture](docs/architecture.md)
-- [AI Usage](docs/ai-usage.md)
-- [Prompts](docs/prompts.md)
-- [E2E Loan Flow](docs/e2e-loan-flow.md)
-- [Postman Testing](docs/postman-testing.md)
+- [`docs/architecture.md`](docs/architecture.md) — arsitektur runtime.
+- [`docs/PRD.md`](docs/PRD.md) — kebutuhan produk.
+- [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md) — kontrak API aktual.
+- [`docs/CODE_REVIEW_LOG.md`](docs/CODE_REVIEW_LOG.md) — temuan code review.
+- [`docs/e2e-loan-flow.md`](docs/e2e-loan-flow.md) — alur pinjam/kembali.
+- [`docs/ai-usage.md`](docs/ai-usage.md) — penggunaan AI dan batas verifikasi.
+- [`docs/FILE-CHANGELOG.md`](docs/FILE-CHANGELOG.md) — daftar perubahan lintas tahap.
+- [`docs/FINAL-UTS-AUDIT.md`](docs/FINAL-UTS-AUDIT.md) — audit final.

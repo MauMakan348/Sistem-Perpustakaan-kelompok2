@@ -10,14 +10,18 @@ async function migrate() {
   await checkDatabaseConnection();
   await pool.query(fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8"));
 
+  // Upgrade skema lama tanpa menghapus baris: pertahankan ID yang sudah ada,
+  // lalu aktifkan AUTO_INCREMENT agar ID buku baru dibuat MySQL.
+  const [idColumns] = await pool.query("SHOW COLUMNS FROM books LIKE 'id'");
+  if (!idColumns.length) throw new Error("Kolom books.id tidak ditemukan.");
+  if (!String(idColumns[0].Extra || "").toLowerCase().includes("auto_increment")) {
+    await pool.query("ALTER TABLE books MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT");
+  }
+
   for (const book of books) {
     await pool.query(
-      `INSERT INTO books (id, title, author, status)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         title = VALUES(title),
-         author = VALUES(author),
-         status = VALUES(status)`,
+      `INSERT IGNORE INTO books (id, title, author, status)
+       VALUES (?, ?, ?, ?)`,
       [book.id, book.title, book.author, book.status]
     );
   }
