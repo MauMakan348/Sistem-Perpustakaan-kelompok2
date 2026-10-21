@@ -64,14 +64,8 @@ async function migrate() {
 
   for (const loan of loans) {
     await pool.query(
-      `INSERT INTO loans (id, username, book_id, book_title, borrow_date, due_date)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         username = VALUES(username),
-         book_id = VALUES(book_id),
-         book_title = VALUES(book_title),
-         borrow_date = VALUES(borrow_date),
-         due_date = VALUES(due_date)`,
+      `INSERT IGNORE INTO loans (id, username, book_id, book_title, borrow_date, due_date)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         loan.id,
         loan.username,

@@ -465,3 +465,28 @@ Setelah selesai, berikan laporan dengan urutan:
 
 Mulai dengan memeriksa seluruh project. Setelah memahami arsitektur dan dependensinya, lakukan perubahan yang diperlukan, uji hasilnya, lalu hasilkan paket project final yang lengkap.
 ````
+
+
+## Prompt penting — Prompt 7: API testing dan bukti UTS
+
+**Konteks:** gunakan `docs/API-CONTRACT.md` dan source project yang ada; jangan membuat hasil tes atau screenshot palsu.  
+**Tujuan:** menyiapkan Postman Collection/environment, skenario login, buku, pinjam, pengembalian, otorisasi, dan catatan hasil.  
+**Hasil AI:** `api-test/collection.json`, `api-test/environment.json`, `api-test/README.md`, `api-test/RESULTS.md`, dan `api-test/evidence/README.md`.  
+**Review manusia:** Putra Aji Pratama, Muhammad Lutfi Rifani, Shandy Aulia, Sri Maharani — impor collection, isi environment rahasia secara lokal, jalankan request, cocokkan respons dan DB, simpan screenshot asli.  
+**Hasil pengujian:** collection dan environment lolos pemeriksaan struktur JSON serta syntax script yang tersedia; request HTTP terhadap backend/MySQL belum dijalankan. Semua status skenario awal ditulis `BELUM DIUJI`.
+
+## Prompt penting — Prompt 8: Code review dan dokumentasi penggunaan AI
+
+**Konteks:** audit source yang sudah ada dan dokumentasi UTS; pertahankan struktur project, jangan mengarang nama reviewer atau klaim pengujian.  
+**Tujuan:** mengidentifikasi temuan nyata, dampak, keputusan/perbaikan, status, bukti verifikasi, dan merekam penggunaan AI.  
+**Hasil AI:** `docs/CODE_REVIEW_LOG.md` ditambahkan; `docs/ai-usage.md` dan `docs/prompts.md` diperbarui. Temuan mencakup route PATCH tanpa ID, perbedaan arsitektur runtime dengan direktori service, konsistensi lintas database, rate limiting yang belum terlihat, dan assertion tes dokumentasi yang gagal.  
+**Review manusia:** Putra Aji Pratama, Muhammad Lutfi Rifani, Shandy Aulia, Sri Maharani  
+**Hasil pengujian:** satu run source-level menghasilkan 13 lulus dan 1 gagal karena assertion pola dokumentasi. Pengujian HTTP/MySQL end-to-end dan race condition runtime belum dilakukan.
+
+## Prompt penting — Prompt 9: Finalisasi project UTS
+
+**Konteks:** audit akhir menggunakan source project, `docs/PRD.md`, `docs/API-CONTRACT.md`, `docs/CODE_REVIEW_LOG.md`, dan hasil pemeriksaan yang benar-benar tersedia. Tidak boleh mengklaim pengujian runtime yang belum dilakukan.
+**Tujuan:** memperjelas README dari instalasi hingga menjalankan backend, menjelaskan MySQL dan `.env.example`, Postman, struktur folder, keamanan data, dan membuat checklist kesiapan pengumpulan dengan status.
+**Hasil AI:** `README.md` diperbarui dan `docs/FINAL-UTS-AUDIT.md` ditambahkan. Paket akhir dibuat tanpa `.env`, `node_modules`, dan file log.
+**Review manusia:** Putra Aji Pratama, Muhammad Lutfi Rifani, Shandy Aulia, Sri Maharani
+**Hasil pemeriksaan aktual saat penyusunan:** `npm run check` berhasil; `npm test` menghasilkan 18 lulus dan 2 gagal pada environment audit (assertion format dokumentasi dan tes yang gagal memuat `bcryptjs`). Tidak ada request HTTP/MySQL end-to-end dijalankan; semua skenario Postman masih `BELUM DIUJI` dan belum ada screenshot hasil aktual.

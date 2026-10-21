@@ -1,95 +1,118 @@
-# Sistem Perpustakaan — Backend API tunggal
+# Sistem Peminjaman Buku Perpustakaan — UTS Vibe Coding
 
-Project ini telah disiapkan untuk target UTS dengan **satu proses backend Node.js** pada port `4000`. Backend menangani route autentikasi, katalog buku, peminjaman, pengembalian, dan riwayat. Frontend tetap berada di folder `frontend/` dan dapat dilayani langsung oleh backend; Postman dapat menguji API tanpa menjalankan frontend terpisah.
+## Deskripsi dan teknologi
 
-## Arsitektur saat ini
+Aplikasi web sederhana untuk registrasi/login, katalog buku, peminjaman, riwayat transaksi, dan pengembalian. Jalur runtime pada paket ini adalah **satu backend Node.js** (`backend/server.js`) dengan HTTP API, frontend statis (`frontend/`), serta satu database MySQL berisi tabel `users`, `books`, dan `loans`. Folder `api-gateway/`, `book-service/`, dan `loan-service/` adalah implementasi/artefak legacy yang dipertahankan; `npm start` tidak menjalankannya.
 
-```text
-Client / Postman / Frontend
-           |
-           v
-Backend API tunggal :4000
-   |                    |
-   v                    v
-MySQL book_db        MySQL loan_db
-(tabel books)        (tabel users, loans)
-```
-
-Untuk mempertahankan data yang ada, backend utama menggunakan dua database MySQL yang sudah digunakan project (`book_db` dan `loan_db`). Semua akses database dilakukan langsung dari proses backend; tidak ada request runtime ke port Book Service `4001` atau Loan Service `4002`.
-
-Folder `api-gateway/`, `book-service/`, dan `loan-service/` tetap dipertahankan sebagai kode historis dan referensi/pemulihan pada tahap migrasi ini. Script `npm start` tidak menjalankan file server lama.
+Teknologi utama: Node.js, HTTP server bawaan Node, MySQL, `mysql2`, `bcryptjs`, `jsonwebtoken`, `dotenv`, HTML, CSS, JavaScript, dan Postman.
 
 ## Persyaratan
 
-- Node.js dan npm
-- MySQL aktif dengan database `book_db` dan `loan_db` yang sudah ada
-- Kredensial database dengan izin akses ke kedua database
+- Node.js yang mendukung sintaks yang digunakan (disarankan Node.js LTS modern).
+- npm.
+- MySQL aktif dan akun database yang boleh membuat database/tabel serta membaca database lama bila migrasi legacy diperlukan.
+- Postman (opsional, untuk pengujian API manual).
 
-## Menyiapkan environment
+## Instalasi dan konfigurasi environment
 
-Dari root repository:
+Dari direktori root repository:
 
 ```bash
+npm ci
 cp .env.example .env
 ```
 
-Edit `.env` dan isi `DB_USER`, `DB_PASSWORD`, `API_KEY`, serta `JWT_SECRET`. Gunakan JWT secret acak minimal 32 byte. Jangan commit atau membagikan `.env`.
+Edit `.env` secara lokal; jangan commit atau membagikannya. Contoh variabel yang perlu disesuaikan:
 
-Jangan menjalankan migration jika tidak diperlukan. Untuk membuat schema/seed pada instalasi baru, periksa dulu isi migration dan pastikan database target benar:
+```dotenv
+PORT=4000
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=perpustakaan_db
+LEGACY_BOOK_DB_NAME=book_db
+LEGACY_LOAN_DB_NAME=loan_db
+API_KEY=ganti-dengan-api-key-random
+JWT_SECRET=ganti-dengan-secret-random-minimal-32-byte
+JWT_EXPIRES_IN=2h
+```
+
+Isi `DB_PASSWORD` dengan password MySQL lokal yang benar. `JWT_SECRET` harus minimal 32 byte. `API_KEY` harus berupa nilai acak lokal. `LEGACY_BOOK_DB_NAME` dan `LEGACY_LOAN_DB_NAME` hanya digunakan oleh migrator; backend runtime menggunakan `DB_NAME`.
+
+## Menyiapkan database
+
+Pastikan MySQL server berjalan, lalu dari root proyek jalankan:
 
 ```bash
 npm run migrate
 ```
 
-Perintah migration memakai script service lama untuk mempertahankan schema yang telah ada; tidak diperlukan untuk menjalankan backend bila tabel sudah tersedia.
+Migrator membuat schema `users`, `books`, `loans` pada `DB_NAME`. Jika database legacy tersedia, migrator mencoba menyalin data dari database sumber yang dikonfigurasi; database sumber tidak dihapus atau diubah. `INSERT IGNORE` dapat melewati konflik ID/username, jadi periksa log dan rekonsiliasi jumlah baris. Buat backup sebelum migrasi database yang berisi data penting. Jangan jalankan migrasi pertama kali pada database produksi tanpa rencana pemulihan.
 
-## Instalasi dan menjalankan
+Akun baru dibuat melalui `POST /api/register`; tidak ada akun/password admin bawaan. Endpoint tambah buku `POST /api/books` hanya menerima token akun dengan role `admin`, sementara registrasi normal membuat role `user`. Jangan mengubah role atau data produksi hanya untuk membuat tes lulus; gunakan database lokal terpisah.
+
+## Menjalankan aplikasi
+
+Satu perintah untuk backend utama:
 
 ```bash
-npm install
 npm start
 ```
 
-Backend melakukan pengecekan koneksi ke kedua database sebelum listen pada `http://localhost:4000`. Untuk health check:
+Backend menguji koneksi MySQL saat startup dan gagal memulai jika database tidak dapat diakses atau `JWT_SECRET` tidak valid. Setelah berjalan:
 
-```bash
-curl -i http://localhost:4000/health
-```
+- Frontend: <http://localhost:4000/>
+- Health check: <http://localhost:4000/health>
+- Base URL API: `http://localhost:4000`
 
-Buka `http://localhost:4000/` untuk frontend. API bisa diuji langsung lewat Postman pada base URL `http://localhost:4000`.
+Frontend disajikan oleh backend utama dan memanggil API dengan path same-origin.
 
-## Endpoint utama
+## API utama
 
-| Method | Endpoint | Fungsi | Akses |
-|---|---|---|---|
-| POST | `/api/register` | Registrasi | Publik |
-| POST | `/api/login` | Login dan memperoleh JWT | Publik |
-| GET | `/api/books` | Daftar buku | JWT atau `X-API-Key` |
-| GET | `/api/books/:id` | Detail buku | JWT atau `X-API-Key` |
-| POST | `/api/books` | Tambah buku | JWT role `admin` |
-| POST | `/api/loans` | Meminjam buku | JWT |
-| GET | `/api/loans/:username` | Riwayat pengguna sendiri | JWT |
-| POST | `/api/loans/:id/return` | Mengembalikan buku | JWT pemilik transaksi |
+- `POST /api/register`
+- `POST /api/login`
+- `GET /api/books`
+- `GET /api/books/:id`
+- `POST /api/books` (JWT role admin)
+- `PATCH /api/books/:id/status` (API Key internal)
+- `POST /api/loans`
+- `GET /api/loans/:username` (hanya pemilik JWT)
+- `POST /api/loans/:id/return` (hanya pemilik transaksi)
 
-`PATCH /api/books/:id/status` tetap tersedia untuk operasi administratif internal dan memerlukan `X-API-Key`. Frontend tidak menyimpan API key; gunakan login untuk operasi pengguna.
+Untuk detail header, request, response, validasi, dan status HTTP, baca [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md). Identitas peminjam diambil dari JWT; `username` dari body bukan bukti otorisasi. Batas aktif adalah tiga peminjaman, status buku harus `tersedia`, dan jatuh tempo dihitung tujuh kali 24 jam dari tanggal pinjam.
 
-## Business rule
+## Postman
 
-- Maksimal 3 peminjaman aktif per pengguna.
-- Buku hanya bisa dipinjam jika status `tersedia`.
-- Jatuh tempo adalah tanggal peminjaman ditambah 7 hari.
-- Saat peminjaman berhasil, status buku berubah menjadi `dipinjam`; setelah pengembalian berhasil, status berubah menjadi `tersedia`.
-- Password disimpan sebagai bcrypt hash, bukan teks biasa. Token JWT memiliki masa berlaku.
+1. Jalankan MySQL, migrasi, dan backend.
+2. Import `api-test/collection.json` dan `api-test/environment.json` ke Postman.
+3. Pilih environment `Sistem Perpustakaan - Local Test (safe template)`.
+4. Isi variabel lokal `apiKey`, `password`, `wrongPassword`, `otherUsername`, dan ID data uji yang diperlukan. Jangan simpan secret asli dalam file yang dikomit.
+5. Jalankan health, register, login, daftar/detail buku, pinjam, status setelah pinjam, return, dan status setelah return sesuai prasyarat pada `api-test/README.md`.
+6. Skenario batas tiga pinjaman membutuhkan akun yang memiliki tepat tiga pinjaman aktif dan buku keempat tersedia. Skenario buku tidak tersedia memerlukan ID buku berstatus `dipinjam`. Skenario lain yang memerlukan ID tak ditemukan perlu memakai ID positif yang benar-benar tidak ada.
+7. Catat hasil aktual di `api-test/RESULTS.md`. Jangan tandai PASS sebelum request benar-benar dijalankan dan response serta perubahan database diperiksa. Screenshot contoh belum disediakan karena belum ada eksekusi Postman yang dapat dibuktikan pada environment penyusunan paket.
 
-## Pengujian
+## Pengujian otomatis
 
 ```bash
 npm run check
 npm test
+node --check frontend/script.js
 ```
 
-`npm run check` memeriksa sintaks file JavaScript. Tes source-level bukan pengganti tes integrasi database. Jalankan skenario Postman pada `postman/Sistem-Perpustakaan.postman_collection.json` dan catat hasil aktual sebelum menyatakan fitur lulus.
+Tes saat ini memeriksa source/kontrak dan tidak menjalankan server HTTP atau MySQL. Tes integrasi harus dilakukan pada lingkungan dengan dependency dan database aktif. `npm test` yang lulus tidak boleh dilaporkan sebagai bukti bahwa seluruh endpoint lulus runtime.
 
-## Catatan migrasi
+## Status verifikasi paket ini
 
-Perubahan ini mengalihkan startup ke `backend/server.js`. Service lama dan database tidak dihapus. Backend utama tetap menggunakan schema `books` pada `book_db`, serta `users` dan `loans` pada `loan_db`. Sebelum menghapus kode lama atau menggabungkan database, lakukan code review dan tes end-to-end terlebih dahulu.
+Pada audit dokumen ini, `npm test` lulus **24/24 source-level tests**; `npm run check` dan `node --check frontend/script.js` juga lulus. Dependency runtime (`mysql2`, `bcryptjs`, `jsonwebtoken`, `dotenv`) tidak tersedia pada environment audit, `mysql` CLI tidak tersedia, dan `.env` lokal tidak ada. Karena itu migrasi MySQL, `npm start`, request HTTP, Postman, perubahan database, dan concurrency runtime berstatus **NOT TESTED**. Rincian ada di [`docs/FINAL-UTS-AUDIT.md`](docs/FINAL-UTS-AUDIT.md) dan [`api-test/RESULTS.md`](api-test/RESULTS.md).
+
+## Dokumentasi utama
+
+- [`docs/architecture.md`](docs/architecture.md) — arsitektur runtime.
+- [`docs/PRD.md`](docs/PRD.md) — kebutuhan produk.
+- [`docs/API-CONTRACT.md`](docs/API-CONTRACT.md) — kontrak API aktual.
+- [`docs/CODE_REVIEW_LOG.md`](docs/CODE_REVIEW_LOG.md) — temuan code review.
+- [`docs/e2e-loan-flow.md`](docs/e2e-loan-flow.md) — alur pinjam/kembali.
+- [`docs/ai-usage.md`](docs/ai-usage.md) — penggunaan AI dan batas verifikasi.
+- [`docs/FILE-CHANGELOG.md`](docs/FILE-CHANGELOG.md) — daftar perubahan lintas tahap.
+- [`docs/FINAL-UTS-AUDIT.md`](docs/FINAL-UTS-AUDIT.md) — audit final.

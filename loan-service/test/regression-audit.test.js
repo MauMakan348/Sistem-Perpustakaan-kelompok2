@@ -41,8 +41,8 @@ test('loan history includes returned records and return is idempotently rejected
 });
 
 
-test('book seed migration preserves live availability status on duplicate IDs', () => {
+test('book seed migration does not overwrite any existing row', () => {
   const bookMigration = fs.readFileSync(path.join(bookDir, 'migrate.js'), 'utf8');
-  assert.match(bookMigration, /ON DUPLICATE KEY UPDATE\s+title = VALUES\(title\),\s+author = VALUES\(author\)/);
-  assert.doesNotMatch(bookMigration, /status = VALUES\(status\)/);
+  assert.match(bookMigration, /INSERT IGNORE INTO books/);
+  assert.doesNotMatch(bookMigration, /ON DUPLICATE KEY UPDATE/i);
 });

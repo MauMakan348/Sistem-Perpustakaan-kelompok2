@@ -15,8 +15,10 @@ test('backend utama memiliki route auth, buku, peminjaman, pengembalian, dan hea
   assert.ok(source.includes('returnMatch = pathname.match(') && source.includes('\\/return$'));
 });
 test('backend memakai database yang ada dan tidak mengirim HTTP ke service lama', () => {
-  assert.match(source, /BOOK_DB_NAME/);
-  assert.match(source, /LOAN_DB_NAME/);
+  assert.match(source, /DB_NAME/);
+  assert.doesNotMatch(source, /BOOK_DB_NAME|LOAN_DB_NAME/);
+  assert.match(source, /if \(\/\^\\\/api\\\/books\\\/\\d\+\\\/status\$\/\.test\(pathname\) && req\.method === 'PATCH'\)/);
+  assert.doesNotMatch(source, /pathname === '\/api\/books' && req\.method === 'PATCH'/);
   assert.match(source, /mysql\.createPool/);
   assert.doesNotMatch(source, /BOOK_SERVICE_PORT|LOAN_SERVICE_PORT|http\.request\(/);
 });

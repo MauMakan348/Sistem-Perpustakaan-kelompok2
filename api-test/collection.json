@@ -1,0 +1,883 @@
+{
+  "info": {
+    "_postman_id": "2cbf3c76-8c64-4e66-a2b8-5f95f5d7a104",
+    "name": "Sistem Perpustakaan - Backend Utama",
+    "description": "Collection berbasis route aktual backend/server.js. Gunakan hanya database lokal/pengujian. Skenario dengan prasyarat harus disiapkan manual; collection tidak membuat atau mengubah data secara destruktif. Semua hasil runtime perlu dicatat terpisah.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "wrongPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otherUsername",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "availableBookId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "borrowedBookId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fourthBookId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "loanId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notFoundLoanId",
+      "value": "999999999",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Health check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Publik. Memeriksa proses backend menjawab."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); pm.test('health ok',()=>pm.expect(pm.response.json().status).to.eql('ok'))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Register test user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "register"
+          ]
+        },
+        "description": "Buat akun uji baru. Isi username unik dan password hanya pada environment lokal.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201',()=>pm.response.to.have.status(201)); if(pm.response.code===201){pm.environment.set('userId',String(pm.response.json().user.id)); pm.environment.set('username',pm.response.json().user.username); pm.test('no password hash in response',()=>pm.expect(JSON.stringify(pm.response.json())).not.to.include('password_hash'));}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Login valid",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ]
+        },
+        "description": "Login akun uji. Token disimpan hanya di Postman environment lokal.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); if(pm.response.code===200){pm.environment.set('token',pm.response.json().token);pm.test('Bearer token returned',()=>pm.expect(pm.response.json().tokenType).to.eql('Bearer'));}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Login wrong password",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ]
+        },
+        "description": "Harus menggunakan username yang ada dan password salah.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{wrongPassword}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401',()=>pm.response.to.have.status(401))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Register invalid username",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/register",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "register"
+          ]
+        },
+        "description": "Username invalid; expects 400.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"x\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400',()=>pm.response.to.have.status(400))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Books list",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "X-API-Key",
+            "value": "{{apiKey}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/books",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "books"
+          ]
+        },
+        "description": "JWT user atau API Key diperlukan."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); if(pm.response.code===200 && Array.isArray(pm.response.json())){const books=pm.response.json();const available=books.find(b=>b.status==='tersedia');const borrowed=books.find(b=>b.status==='dipinjam');if(available)pm.environment.set('availableBookId',String(available.id));if(borrowed)pm.environment.set('borrowedBookId',String(borrowed.id));pm.test('list response is array',()=>pm.expect(books).to.be.an('array'));}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Book detail",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/books/{{availableBookId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "books",
+            "{{availableBookId}}"
+          ]
+        },
+        "description": "Pilih ID buku tersedia dari Books list."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); pm.test('book ID matches',()=>pm.expect(String(pm.response.json().id)).to.eql(pm.environment.get('availableBookId')))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Book detail invalid ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/books/not-a-number",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "books",
+            "not-a-number"
+          ]
+        },
+        "description": "Endpoint menerima path string lalu memvalidasi ID menjadi 400."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400',()=>pm.response.to.have.status(400))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Borrow available book",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans"
+          ]
+        },
+        "description": "Pastikan availableBookId menunjuk buku tersedia dan akun belum mencapai batas 3 pinjaman aktif.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{availableBookId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 201',()=>pm.response.to.have.status(201)); if(pm.response.code===201){const loan=pm.response.json().loan;pm.environment.set('loanId',String(loan.id));pm.environment.set('borrowedBookId',String(loan.bookId));pm.test('loan active',()=>pm.expect(loan.status).to.eql('active'));pm.test('due date is exactly 7x24 hours',()=>pm.expect(new Date(loan.dueDate).getTime()-new Date(loan.borrowDate).getTime()).to.eql(7*24*60*60*1000));}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Book status after borrow",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/books/{{borrowedBookId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "books",
+            "{{borrowedBookId}}"
+          ]
+        },
+        "description": "Jalankan sesudah Borrow available book; status harus dipinjam."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); pm.test('status dipinjam',()=>pm.expect(pm.response.json().status).to.eql('dipinjam'))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Borrow unavailable book",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans"
+          ]
+        },
+        "description": "Prasyarat: borrowedBookId harus menunjuk buku yang sudah dipinjam dan bukan tersedia.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{borrowedBookId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409 expected if book is unavailable',()=>pm.response.to.have.status(409))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Borrow fourth book (setup required)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans"
+          ]
+        },
+        "description": "Jalankan hanya setelah user mempunyai tepat 3 pinjaman aktif dan fourthBookId adalah buku tersedia yang berbeda.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{fourthBookId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409 at active-loan limit',()=>pm.response.to.have.status(409)); pm.test('limit message',()=>pm.expect(pm.response.json().error).to.include('3 buku aktif'))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Own loan history",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans/{{username}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans",
+            "{{username}}"
+          ]
+        },
+        "description": "Riwayat pemilik JWT."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); pm.test('array response',()=>pm.expect(pm.response.json()).to.be.an('array'))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Other user history forbidden",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans/{{otherUsername}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans",
+            "{{otherUsername}}"
+          ]
+        },
+        "description": "otherUsername harus berbeda dari username token."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 403',()=>pm.response.to.have.status(403))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Return loan",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans/{{loanId}}/return",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans",
+            "{{loanId}}",
+            "return"
+          ]
+        },
+        "description": "Jalankan setelah Borrow available book; mengembalikan transaksi milik token."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); if(pm.response.code===200){pm.test('returned status',()=>pm.expect(pm.response.json().loan.status).to.eql('returned'));pm.environment.set('returnedLoanId',pm.environment.get('loanId'));}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Book status after return",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/books/{{borrowedBookId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "books",
+            "{{borrowedBookId}}"
+          ]
+        },
+        "description": "Jalankan setelah Return loan; status harus tersedia."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200',()=>pm.response.to.have.status(200)); pm.test('status tersedia',()=>pm.expect(pm.response.json().status).to.eql('tersedia'))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Return same loan again",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans/{{loanId}}/return",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans",
+            "{{loanId}}",
+            "return"
+          ]
+        },
+        "description": "Jalankan setelah Return loan berhasil."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 409',()=>pm.response.to.have.status(409))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Borrow without token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans"
+          ]
+        },
+        "description": "Auth failure case.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookId\": \"{{availableBookId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 401',()=>pm.response.to.have.status(401))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Borrow missing bookId",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans"
+          ]
+        },
+        "description": "Validation failure case.",
+        "body": {
+          "mode": "raw",
+          "raw": "{}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 400',()=>pm.response.to.have.status(400))"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Return transaction not found",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/loans/{{notFoundLoanId}}/return",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "loans",
+            "{{notFoundLoanId}}",
+            "return"
+          ]
+        },
+        "description": "Gunakan ID positif yang dipastikan tidak ada di DB pengujian."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 404',()=>pm.response.to.have.status(404))"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

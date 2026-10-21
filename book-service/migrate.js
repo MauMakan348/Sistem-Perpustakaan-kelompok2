@@ -20,11 +20,8 @@ async function migrate() {
 
   for (const book of books) {
     await pool.query(
-      `INSERT INTO books (id, title, author, status)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         title = VALUES(title),
-         author = VALUES(author)`,
+      `INSERT IGNORE INTO books (id, title, author, status)
+       VALUES (?, ?, ?, ?)`,
       [book.id, book.title, book.author, book.status]
     );
   }
